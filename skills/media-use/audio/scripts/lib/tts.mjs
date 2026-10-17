@@ -6,9 +6,12 @@ import { fetchMedia } from "../../../scripts/lib/media-fetch.mjs";
 //        Direct v3 REST (NOT `hyperframes tts`, which in the published build is
 //        Kokoro-only and silently ignores a HeyGen key). Returns word_timestamps
 //        in the same call, so no separate transcribe pass.
-//   2. ElevenLabs         — $ELEVENLABS_API_KEY + `pip install elevenlabs`. No
+//   2. OpenAI             — $OPENAI_API_KEY. Pure fetch, no Python. No word
+//        timings → caller chains transcribeWav() (HYPERFRAMES_TRANSCRIBE_ENGINE=openai
+//        makes that the Whisper API as well).
+//   3. ElevenLabs         — $ELEVENLABS_API_KEY + `pip install elevenlabs`. No
 //        word timings → caller chains transcribeWav().
-//   3. Kokoro-82M (local) — always available, via the published `hyperframes tts`
+//   4. Kokoro-82M (local) — always available, via the published `hyperframes tts`
 //        CLI. No word timings → caller chains transcribeWav().
 //
 // "HeyGen available" is decided by CREDENTIAL presence (heygenCredential), never
@@ -22,10 +25,14 @@ import { heygenAuthHeaders, heygenCredential, heygenJSON, heygenMessage } from "
 import { pythonInvocation } from "./python.mjs";
 import { synthesizeGemini } from "./gemini-tts.mjs";
 import { geminiConfigured } from "./gemini-auth.mjs";
+import { OPENAI_TTS_DEFAULT_VOICE, openaiConfigured, synthesizeOpenAI } from "./openai-tts.mjs";
 
 // ── provider detection ────────────────────────────────────────────────────────
 export function heygenAvailable() {
   return heygenCredential() !== null;
+}
+export function openaiAvailable() {
+  return openaiConfigured();
 }
 export function elevenlabsAvailable() {
   if (!process.env.ELEVENLABS_API_KEY) return false;
@@ -39,28 +46,35 @@ export function elevenlabsAvailable() {
 // First available provider wins; an explicit choice is honored (and validated).
 export function pickProvider(userProvider) {
   if (userProvider) {
-    if (!["heygen", "elevenlabs", "kokoro", "gemini"].includes(userProvider))
-      throw new Error(`invalid provider "${userProvider}" (heygen | elevenlabs | kokoro | gemini)`);
+    if (!["heygen", "openai", "elevenlabs", "kokoro", "gemini"].includes(userProvider))
+      throw new Error(
+        `invalid provider "${userProvider}" (heygen | openai | elevenlabs | kokoro | gemini)`,
+      );
     if (userProvider === "gemini" && !geminiConfigured())
       throw new Error(
         "provider=gemini needs GEMINI_API_KEY or GOOGLE_API_KEY, or service-account credentials (GOOGLE_APPLICATION_CREDENTIALS or GCS_CREDS)",
       );
     // heygenAuthHeaders owns the reason and its fix: no credential, or a credentials path that cannot be read.
     if (userProvider === "heygen" && !heygenAvailable()) heygenAuthHeaders();
+    if (userProvider === "openai" && !openaiAvailable())
+      throw new Error("provider=openai but $OPENAI_API_KEY is not set");
     if (userProvider === "elevenlabs" && !process.env.ELEVENLABS_API_KEY)
       throw new Error("provider=elevenlabs but $ELEVENLABS_API_KEY is not set");
     return userProvider;
   }
-  return heygenAvailable() ? "heygen" : elevenlabsAvailable() ? "elevenlabs" : "kokoro";
+  if (heygenAvailable()) return "heygen";
+  if (openaiAvailable()) return "openai";
+  return elevenlabsAvailable() ? "elevenlabs" : "kokoro";
 }
 
 // ── voice resolution ──────────────────────────────────────────────────────────
 // HeyGen /v3/voices/speech only accepts STARFISH voice_ids; auto-pick the first
-// English public starfish voice when none is pinned. ElevenLabs/Kokoro have
+// English public starfish voice when none is pinned. OpenAI/ElevenLabs/Kokoro have
 // their own defaults.
 export async function resolveVoiceId({ provider, userVoice, lang = "en" }) {
   if (userVoice) return userVoice;
   if (provider === "gemini") return "Kore";
+  if (provider === "openai") return OPENAI_TTS_DEFAULT_VOICE; // multilingual
   if (provider === "elevenlabs") return "21m00Tcm4TlvDq8ikWAM"; // Rachel
   if (provider === "kokoro") {
     if (lang === "en") return "am_michael";
@@ -244,7 +258,7 @@ save(audio, sys.argv[3])
 
 // ── synthesize one line ───────────────────────────────────────────────────────
 // Writes wav at wavAbs. Returns { ok, words, error } — words is the raw
-// [{text,start,end}] array for HeyGen (native), or null for ElevenLabs/Kokoro
+// [{text,start,end}] array for HeyGen (native), or null for OpenAI/ElevenLabs/Kokoro
 // (caller must transcribeWav). Never throws; failures return { ok:false, error }
 // where `error` states WHY (so the caller can surface it, not a bare "TTS failed").
 export async function synthesizeOne({
@@ -261,6 +275,11 @@ export async function synthesizeOne({
   if (provider === "heygen") return synthesizeHeygen({ text, voiceId, lang, speed, wavAbs });
   if (provider === "gemini")
     return synthesizeGemini({ text, voiceId, model, style, speed, wavAbs });
+  if (provider === "openai")
+    return synthesizeOpenAI(
+      { text, voiceId, model, style, speed, wavAbs },
+      { transcode: transcodeToWav },
+    );
   if (provider === "elevenlabs") {
     // The Python helper writes straight to wavAbs; unlike heygen (transcodeToWav)
     // and kokoro (the `hyperframes tts` CLI), it does NOT create the parent dir,
@@ -352,7 +371,7 @@ export async function synthesizeHeygen({ text, voiceId, lang, speed, wavAbs }, d
   }
 }
 
-// ElevenLabs/Kokoro have no word timings — run Whisper over the wav. Returns the
+// OpenAI/ElevenLabs/Kokoro have no word timings — run Whisper over the wav. Returns the
 // flat [{id,text,start,end}] word array, or null. Each call uses a throwaway
 // --dir so parallel scenes don't collide on transcript.json.
 export async function transcribeWav({ wavRel, lang = "en", hyperframesDir }) {

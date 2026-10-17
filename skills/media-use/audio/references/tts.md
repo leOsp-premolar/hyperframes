@@ -43,8 +43,9 @@ to HeyGen sign-in. Read the Gemini section for its credential requirement.
 | Order | Provider          | Env trigger                                                          | Voice IDs                                                                                  | Word timestamps                           | Audio format         |
 | ----- | ----------------- | -------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ | ----------------------------------------- | -------------------- |
 | 1     | HeyGen (Starfish) | `$HEYGEN_ACCESS_TOKEN` / `$HEYGEN_API_KEY` / `~/.heygen/credentials` | UUIDs from `GET /v3/voices?engine=starfish`, or your cloned voice ids (`heygen-voice.mjs`) | **Yes** (`word_timestamps[]` in response) | mp3 → wav via ffmpeg |
-| 2     | ElevenLabs        | `$ELEVENLABS_API_KEY`                                                | UUIDs from elevenlabs.io dashboard                                                         | No                                        | mp3 → wav via ffmpeg |
-| 3     | Kokoro-82M        | always (local fallback)                                              | `am_michael`, `af_heart`, … (54 voices)                                                    | No                                        | wav direct           |
+| 2     | OpenAI            | `$OPENAI_API_KEY`                                                    | `alloy` (default), `ash`, `coral`, `echo`, `nova`, `onyx`, `sage`, `shimmer`, …            | No                                        | wav → wav via ffmpeg |
+| 3     | ElevenLabs        | `$ELEVENLABS_API_KEY`                                                | UUIDs from elevenlabs.io dashboard                                                         | No                                        | mp3 → wav via ffmpeg |
+| 4     | Kokoro-82M        | always (local fallback)                                              | `am_michael`, `af_heart`, … (54 voices)                                                    | No                                        | wav direct           |
 
 ```bash
 # Local Kokoro CLI
@@ -107,6 +108,7 @@ node skills/media-use/audio/scripts/heygen-voice.mjs delete <voice_id>
 | Goal                                                      | Use                                                       |
 | --------------------------------------------------------- | --------------------------------------------------------- |
 | Best voice quality + word timestamps in one call          | **HeyGen**                                                |
+| Cloud TTS with only an OpenAI key (style via `--style`)   | **OpenAI** (`--provider openai`, `--tts-model tts-1-hd`)  |
 | Drop-in cloud TTS, big voice catalog                      | **ElevenLabs**                                            |
 | Offline, no API key, fast iteration                       | **Kokoro**                                                |
 | Directed delivery with Gemini prebuilt or custom voices   | **Gemini** (explicit selection; transcription for timing) |

@@ -28,6 +28,7 @@ import {
   sherpaUnsupportedReason,
   transcribeWithSherpa,
 } from "../whisper/sherpa.js";
+import { openaiApiKey, OPENAI_API_KEY_ENV, transcribeWithOpenAI } from "../whisper/openai.js";
 import { TRANSCRIPT_FILE } from "../whisper/transcriptFile.js";
 import {
   transcribe as transcribeWithWhisper,
@@ -38,10 +39,14 @@ import {
 // finishing even on the fastest hardware for the shortest clip.
 export const MIN_TIMEOUT_MS = 5000;
 
-export type TranscribeEngine = "auto" | "parakeet" | "whisper";
+export type TranscribeEngine = "auto" | "parakeet" | "whisper" | "openai";
 export type CaptionFormat = "srt" | "vtt";
-/** The program that does the work: Parakeet runs on sherpa-onnx or parakeet-mlx. */
-export type TranscribeRunner = ParakeetRunner | "whisper";
+/** The program that does the work: Parakeet runs on sherpa-onnx or parakeet-mlx; openai is the hosted Whisper API. */
+export type TranscribeRunner = ParakeetRunner | "whisper" | "openai";
+/** The engine a runner belongs to. */
+export type TranscribeEngineName = "parakeet" | "whisper" | "openai";
+/** Env var naming the engine used when none is passed, so scripts that shell out can opt in. */
+const TRANSCRIBE_ENGINE_ENV = "HYPERFRAMES_TRANSCRIBE_ENGINE";
 export type TranscribeProgressEvent = TranscribeProgress;
 export type { TranscriptFormat };
 
@@ -55,7 +60,7 @@ export interface TranscribeCaptionsOptions {
 
 export interface TranscribeEngineEvent {
   runner: TranscribeRunner;
-  engine: "parakeet" | "whisper";
+  engine: TranscribeEngineName;
   /** The model whisper runs, after `language` picks the multilingual twin; whisper engine only. */
   model: string;
   /** Set when auto mode gave up on Parakeet and this runner takes over. */
@@ -67,7 +72,10 @@ export interface TranscribeOptions {
   input: string;
   /** Where transcript.json goes; caption scripts in this folder's .html files are patched. Default: the input's folder. */
   dir?: string;
-  /** Default "auto": Parakeet when installed and it covers `language`, else whisper. */
+  /**
+   * Default "auto" (or $HYPERFRAMES_TRANSCRIBE_ENGINE): Parakeet when installed and it covers
+   * `language`, else whisper. "openai" uses the hosted Whisper API and needs $OPENAI_API_KEY.
+   */
   engine?: TranscribeEngine;
   /** Whisper model. Parakeet has its own fixed model. */
   model?: string;
@@ -95,7 +103,7 @@ export interface TranscribeOptions {
 export type TranscribeResult =
   | {
       kind: "transcribed";
-      engine: "parakeet" | "whisper";
+      engine: TranscribeEngineName;
       model: string;
       detectedLanguage: string | null;
       wordCount: number;
@@ -326,6 +334,7 @@ function pickRunner(
   parakeet: () => ParakeetRunner | null,
   language?: string,
 ): TranscribeRunner {
+  if (engine === "openai") return "openai";
   if (engine === "whisper" || !parakeetSpeaks(language)) return "whisper";
   return parakeet() ?? "whisper";
 }
@@ -340,7 +349,8 @@ function withoutTrailingDots(text: string): string {
   return text.slice(0, end);
 }
 
-const engineOf = (runner: TranscribeRunner) => (runner === "whisper" ? "whisper" : "parakeet");
+const engineOf = (runner: TranscribeRunner): TranscribeEngineName =>
+  runner === "whisper" || runner === "openai" ? runner : "parakeet";
 
 /** The ASR subprocess's last stderr lines, which execFileSync captures but otherwise drops. */
 function failureMessage(err: unknown): string {
@@ -364,11 +374,18 @@ async function transcribeAudio(
   sidecar: CaptionSidecar | undefined,
   options: TranscribeRequest,
 ): Promise<TranscribeResult> {
-  const engine = (options.engine ?? "auto").toLowerCase();
-  if (engine !== "auto" && engine !== "parakeet" && engine !== "whisper") {
+  const requested = options.engine || process.env[TRANSCRIBE_ENGINE_ENV] || "auto";
+  const engine = requested.toLowerCase();
+  if (engine !== "auto" && engine !== "parakeet" && engine !== "whisper" && engine !== "openai") {
     throw new TranscribeError(
       "invalid_option",
-      `Unknown --engine: ${options.engine}. Use auto, parakeet, or whisper.`,
+      `Unknown --engine: ${requested}. Use auto, parakeet, whisper, or openai.`,
+    );
+  }
+  if (engine === "openai" && !openaiApiKey()) {
+    throw new TranscribeError(
+      "invalid_option",
+      `--engine openai needs an OpenAI API key: export ${OPENAI_API_KEY_ENV}=sk-... (or use --engine whisper to transcribe locally).`,
     );
   }
   const unsupported = sherpaUnsupportedReason();
@@ -410,6 +427,13 @@ async function transcribeAudio(
           onProgress: onStatus,
           onEvent: onProgress,
           signal: librarySignal,
+        });
+      case "openai":
+        return transcribeWithOpenAI(inputPath, dir, {
+          language: options.language,
+          onProgress: onStatus,
+          onEvent: onProgress,
+          signal: (cancellation ??= startScope()).signal,
         });
       case "whisper":
         return transcribeWithWhisper(wavPath, dir, {

@@ -14,7 +14,7 @@ node skills/media-use/audio/scripts/heygen-tts.mjs \
 
 `narration.words.json` is already in the `[{ id, text, start, end }]` shape the captions pipeline consumes — no separate transcribe pass.
 
-## Path B — Gemini / ElevenLabs / Kokoro (TTS → transcription)
+## Path B — Gemini / OpenAI / ElevenLabs / Kokoro (TTS → transcription)
 
 These adapters supply audio without word data. The shared audio engine runs
 transcription automatically when timings are absent. For Gemini, use the

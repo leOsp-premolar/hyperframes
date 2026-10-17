@@ -4,7 +4,7 @@
  * media-use skill scripts use, so `auth status` and `doctor`
  * report the same engine the render pipeline would pick:
  *
- *   voice: HeyGen Starfish → ElevenLabs (key + `elevenlabs`) → Kokoro (local)
+ *   voice: HeyGen Starfish → OpenAI (key) → ElevenLabs (key + `elevenlabs`) → Kokoro (local)
  *   music: HeyGen library  → Lyria (key + `google.genai`)   → MusicGen (local)
  *
  * The decision is split from the probing: `decide*` is pure (unit-tested
@@ -21,7 +21,7 @@ export const MUSICGEN_MODULES = ["transformers", "torch", "soundfile", "numpy"];
 export const KOKORO_PIP = "pip install kokoro-onnx soundfile";
 export const MUSICGEN_PIP = "pip install transformers torch soundfile numpy";
 
-export type VoiceEngine = "heygen" | "elevenlabs" | "kokoro";
+export type VoiceEngine = "heygen" | "openai" | "elevenlabs" | "kokoro";
 export type MusicEngine = "heygen" | "lyria" | "musicgen";
 
 export interface EngineReadiness<E> {
@@ -38,6 +38,8 @@ export interface EngineReadiness<E> {
 
 export interface VoiceFacts {
   hasHeygen: boolean;
+  /** OPENAI_API_KEY set; the OpenAI TTS path needs no local modules. */
+  openai: boolean;
   /** ELEVENLABS_API_KEY set AND the `elevenlabs` module importable. */
   elevenlabs: boolean;
   /** Kokoro's local deps importable. */
@@ -54,6 +56,7 @@ export interface MusicFacts {
 
 export function decideVoice(f: VoiceFacts): EngineReadiness<VoiceEngine> {
   if (f.hasHeygen) return { engine: "heygen", label: "HeyGen Starfish", local: false, ready: true };
+  if (f.openai) return { engine: "openai", label: "OpenAI TTS", local: false, ready: true };
   if (f.elevenlabs) return { engine: "elevenlabs", label: "ElevenLabs", local: false, ready: true };
   return {
     engine: "kokoro",
@@ -78,10 +81,12 @@ export function decideMusic(f: MusicFacts): EngineReadiness<MusicEngine> {
 
 /** Collect live voice facts. Skips Python probes when HeyGen is configured. */
 function gatherVoiceFacts(hasHeygen: boolean): VoiceFacts {
-  if (hasHeygen) return { hasHeygen, elevenlabs: false, kokoro: false };
+  if (hasHeygen) return { hasHeygen, openai: false, elevenlabs: false, kokoro: false };
+  const openai = Boolean(process.env["OPENAI_API_KEY"]?.trim());
+  if (openai) return { hasHeygen, openai, elevenlabs: false, kokoro: false };
   const elevenlabs = Boolean(process.env["ELEVENLABS_API_KEY"]) && hasPythonModules(["elevenlabs"]);
   const kokoro = hasPythonModules(KOKORO_MODULES);
-  return { hasHeygen, elevenlabs, kokoro };
+  return { hasHeygen, openai, elevenlabs, kokoro };
 }
 
 /** Collect live music facts. Skips Python probes when HeyGen is configured. */

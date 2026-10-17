@@ -371,6 +371,7 @@ describe("transcribe", () => {
       "utils/stoppableExecFile.test.ts",
       "whisper/manager.ts",
       "whisper/modelForLanguage.ts",
+      "whisper/openai.ts",
       "whisper/parakeet.ts",
       "whisper/sherpa.ts",
       "whisper/transcribe.ts",
@@ -401,6 +402,39 @@ describe("transcribe", () => {
     const err = await transcribeError(options());
     expect(err.code).toBe(code);
     expect(transcribeMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects an unknown engine, naming the engines it accepts", async () => {
+    // @ts-expect-error -- plain JavaScript callers get no compile-time check.
+    const err = await transcribeError({ input: dummyAudio(), engine: "elevenlabs" });
+    expect(err).toMatchObject({
+      code: "invalid_option",
+      message: "Unknown --engine: elevenlabs. Use auto, parakeet, whisper, or openai.",
+    });
+    expect(transcribeMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects the openai engine without OPENAI_API_KEY before any engine runs", async () => {
+    vi.stubEnv("OPENAI_API_KEY", "");
+    try {
+      const err = await transcribeError({ input: dummyAudio(), engine: "openai" });
+      expect(err.code).toBe("invalid_option");
+      expect(err.message).toMatch(/OPENAI_API_KEY/);
+      expect(transcribeMock).not.toHaveBeenCalled();
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
+  it("takes the engine from HYPERFRAMES_TRANSCRIBE_ENGINE when none is passed", async () => {
+    vi.stubEnv("HYPERFRAMES_TRANSCRIBE_ENGINE", "openai");
+    vi.stubEnv("OPENAI_API_KEY", "");
+    try {
+      const err = await transcribeError({ input: dummyAudio() });
+      expect(err.message).toMatch(/--engine openai needs an OpenAI API key/);
+    } finally {
+      vi.unstubAllEnvs();
+    }
   });
 
   it("rejects an unknown caption format from an untyped caller", async () => {

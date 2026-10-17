@@ -70,7 +70,7 @@ vision key is available.
 
 | Capability | Provider order | Key(s) — first match wins | Local dependency |
 |------------|----------------|---------------------------|------------------|
-| **Voice (TTS)** | HeyGen → ElevenLabs → Kokoro | `HEYGEN_API_KEY` → `HYPERFRAMES_API_KEY` → `~/.heygen` · then `ELEVENLABS_API_KEY` | Kokoro: `pip install kokoro-onnx soundfile` |
+| **Voice (TTS)** | HeyGen → OpenAI → ElevenLabs → Kokoro | `HEYGEN_API_KEY` → `HYPERFRAMES_API_KEY` → `~/.heygen` · then `OPENAI_API_KEY` · then `ELEVENLABS_API_KEY` | Kokoro: `pip install kokoro-onnx soundfile` |
 | **Music (BGM)** | HeyGen library → Lyria → MusicGen | HeyGen credential (above) · then `GEMINI_API_KEY` → `GOOGLE_API_KEY` | MusicGen: `pip install transformers torch soundfile numpy` |
 | **Sound effects** | HeyGen library → bundled library | HeyGen credential (above) | bundled — no deps |
 | **Capture descriptions** | OpenRouter → Gemini | `OPENROUTER_API_KEY` → `GEMINI_API_KEY` | None; optional for [website capture](/guides/product-launch-video) |
@@ -146,7 +146,8 @@ to a shared space with `--space`.
 | `HEYGEN_API_BASE` | A host app's gateway for media workflows; never read from a project `.env`. |
 | `HEYGEN_API_URL` | API base URL for `hyperframes` CLI commands (default `https://api.heygen.com`). |
 | `HEYGEN_CONFIG_DIR` | Credentials directory (default `~/.heygen`). |
-| `ELEVENLABS_API_KEY` | ElevenLabs TTS, used when no HeyGen credential is present. |
+| `OPENAI_API_KEY` | OpenAI TTS, used when no HeyGen credential is present; also the key for `hyperframes transcribe --engine openai` (Whisper API). |
+| `ELEVENLABS_API_KEY` | ElevenLabs TTS, used when neither a HeyGen credential nor `OPENAI_API_KEY` is present. |
 | `GEMINI_API_KEY` / `GOOGLE_API_KEY` | Explicit Gemini TTS selection and Lyria music generation; capture descriptions use `GEMINI_API_KEY`. |
 | `GOOGLE_APPLICATION_CREDENTIALS` / `GCS_CREDS` | Gemini TTS service-account JSON file path / injected JSON. Used when neither API key is set. |
 | `GOOGLE_CLOUD_PROJECT` / `GCLOUD_PROJECT_ID` | Gemini OAuth quota project; first set value wins, then the service account project. |

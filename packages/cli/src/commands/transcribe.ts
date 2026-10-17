@@ -20,6 +20,10 @@ export const examples: Example[] = [
   ["Transcribe a video file", "hyperframes transcribe video.mp4"],
   ["Use a larger model for better accuracy", "hyperframes transcribe audio.mp3 --model medium.en"],
   ["Set language to filter non-target speech", "hyperframes transcribe audio.mp3 --language en"],
+  [
+    "Transcribe with the OpenAI Whisper API (needs OPENAI_API_KEY)",
+    "hyperframes transcribe video.mp4 --engine openai --language es",
+  ],
   ["Import an existing SRT file", "hyperframes transcribe subtitles.srt"],
   ["Import an OpenAI Whisper JSON response", "hyperframes transcribe response.json"],
   ["Export captions to SRT", "hyperframes transcribe transcript.json --to srt"],
@@ -51,7 +55,7 @@ export default defineCommand({
     engine: {
       type: "string",
       description:
-        "ASR engine: auto (Parakeet if installed and it covers --language, else whisper), parakeet, or whisper. Default: auto. Parakeet is more accurate and faster; install it with `hyperframes models install parakeet`.",
+        "ASR engine: auto (Parakeet if installed and it covers --language, else whisper), parakeet, whisper, or openai (hosted Whisper API, needs OPENAI_API_KEY). Default: auto, or $HYPERFRAMES_TRANSCRIBE_ENGINE. Parakeet is more accurate and faster; install it with `hyperframes models install parakeet`.",
       alias: "e",
     },
     model: {
@@ -162,6 +166,12 @@ function readTimeout(
   return { ms: Number.parseInt(source, 10), source, origin };
 }
 
+/** The spinner's name for a runner: the requested model for whisper, as it has always shown. */
+function runnerLabel(runner: TranscribeEngineEvent["runner"], model?: string): string {
+  if (runner === "whisper") return model ?? DEFAULT_MODEL;
+  return runner === "openai" ? "OpenAI Whisper" : "Parakeet";
+}
+
 /** Starts the spinner for a runner, or, after a Parakeet failure, says which runner takes over. */
 function showEngine(
   event: TranscribeEngineEvent,
@@ -169,17 +179,18 @@ function showEngine(
   opts: { json: boolean; model?: string },
 ): Spinner | null {
   // The requested model, as the spinner has always shown it; event.model is the one whisper runs.
-  const label = c.accent(event.runner === "whisper" ? (opts.model ?? DEFAULT_MODEL) : "Parakeet");
+  const label = c.accent(runnerLabel(event.runner, opts.model));
   if (event.fallbackReason !== undefined) {
     spin?.clear();
     console.error(c.warn(`${event.fallbackReason}. Using ${event.runner} for this run.`));
     spin?.start(`Transcribing with ${label}...`);
     return spin;
   }
-  // --model selects the whisper model only; Parakeet uses its own fixed model.
+  // --model selects the whisper model only; Parakeet and the OpenAI API use their own fixed model.
   if (event.runner !== "whisper" && opts.model && !opts.json) {
+    const under = runnerLabel(event.runner);
     console.error(
-      c.dim(`  Note: --model applies to the whisper engine only; ignored under Parakeet.`),
+      c.dim(`  Note: --model applies to the whisper engine only; ignored under ${under}.`),
     );
   }
   const started = opts.json ? null : clack.spinner();

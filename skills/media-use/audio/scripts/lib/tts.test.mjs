@@ -228,3 +228,33 @@ test("pickProvider heygen with an unreadable credentials path says to fix that p
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test("pickProvider: openai is accepted explicitly and auto-picked before ElevenLabs", () => {
+  const saved = {};
+  for (const k of [
+    "OPENAI_API_KEY",
+    "ELEVENLABS_API_KEY",
+    "HEYGEN_API_KEY",
+    "HYPERFRAMES_API_KEY",
+    "HOME",
+  ])
+    saved[k] = process.env[k];
+  const home = mkdtempSync(join(tmpdir(), "tts-pick-"));
+  try {
+    delete process.env.HEYGEN_API_KEY;
+    delete process.env.HYPERFRAMES_API_KEY;
+    process.env.HOME = home; // no ~/.heygen
+    delete process.env.OPENAI_API_KEY;
+    assert.throws(() => pickProvider("openai"), /OPENAI_API_KEY is not set/);
+    process.env.OPENAI_API_KEY = "sk-test";
+    process.env.ELEVENLABS_API_KEY = "el-test";
+    assert.equal(pickProvider("openai"), "openai");
+    assert.equal(pickProvider(null), "openai");
+  } finally {
+    for (const [k, v] of Object.entries(saved)) {
+      if (v === undefined) delete process.env[k];
+      else process.env[k] = v;
+    }
+    rmSync(home, { recursive: true, force: true });
+  }
+});
