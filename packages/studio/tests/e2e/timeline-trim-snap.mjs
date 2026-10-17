@@ -2,6 +2,7 @@
 // Trimming a clip's edge must leave the playhead where it was paused, and a dragged clip must
 // land on a ruler line when no other snap target is near. Needs real pointer events and layout.
 import { launchStudioChrome } from "./chrome-executable.mjs";
+import { hoverClipEndEdge } from "./timelineGestures.mjs";
 
 const STUDIO_URL = process.env.STUDIO_URL;
 const OUT_DIR = process.env.OUT_DIR;
@@ -66,16 +67,7 @@ try {
   evidence.playheadRestS = (restX - originX) / pps;
 
   // Trim a's end edge 70 px right; the handle mounts on hover.
-  const edgeX = aBox.x + aBox.width - 3;
-  const midY = aBox.y + aBox.height / 2;
-  await page.mouse.move(edgeX - 20, midY);
-  await page.mouse.move(edgeX, midY);
-  await page.waitForFunction(
-    (sel) =>
-      [...document.querySelectorAll(`${sel} div`)].some((d) => d.style.cursor === "col-resize"),
-    { timeout: 10_000 },
-    clipSelector("card-a"),
-  );
+  const { edgeX, midY } = await hoverClipEndEdge(page, clipSelector("card-a"), aBox);
   await page.mouse.down();
   for (const dx of [10, 30, 50, 70]) {
     await page.mouse.move(edgeX + dx, midY);
