@@ -18,6 +18,7 @@ import {
   synthesizeHeygen,
   synthResult,
   pickProvider,
+  elevenlabsAvailable,
 } from "./tts.mjs";
 
 test("parseFfmpegDurationBanner reads ffmpeg's stderr Duration line", () => {
@@ -229,7 +230,7 @@ test("pickProvider heygen with an unreadable credentials path says to fix that p
   }
 });
 
-test("pickProvider: openai is accepted explicitly and auto-picked before ElevenLabs", () => {
+test("pickProvider: openai is accepted explicitly and auto-picked when ElevenLabs is not set up", () => {
   const saved = {};
   for (const k of [
     "OPENAI_API_KEY",
@@ -247,9 +248,14 @@ test("pickProvider: openai is accepted explicitly and auto-picked before ElevenL
     delete process.env.OPENAI_API_KEY;
     assert.throws(() => pickProvider("openai"), /OPENAI_API_KEY is not set/);
     process.env.OPENAI_API_KEY = "sk-test";
-    process.env.ELEVENLABS_API_KEY = "el-test";
+    delete process.env.ELEVENLABS_API_KEY;
     assert.equal(pickProvider("openai"), "openai");
     assert.equal(pickProvider(null), "openai");
+    // ElevenLabs still wins auto mode when it is configured (key + Python module).
+    process.env.ELEVENLABS_API_KEY = "el-test";
+    const expected = elevenlabsAvailable() ? "elevenlabs" : "openai";
+    assert.equal(pickProvider(null), expected);
+    assert.equal(pickProvider("elevenlabs"), "elevenlabs");
   } finally {
     for (const [k, v] of Object.entries(saved)) {
       if (v === undefined) delete process.env[k];

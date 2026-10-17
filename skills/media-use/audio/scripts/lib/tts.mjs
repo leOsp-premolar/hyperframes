@@ -6,11 +6,12 @@ import { fetchMedia } from "../../../scripts/lib/media-fetch.mjs";
 //        Direct v3 REST (NOT `hyperframes tts`, which in the published build is
 //        Kokoro-only and silently ignores a HeyGen key). Returns word_timestamps
 //        in the same call, so no separate transcribe pass.
-//   2. OpenAI             — $OPENAI_API_KEY. Pure fetch, no Python. No word
-//        timings → caller chains transcribeWav() (HYPERFRAMES_TRANSCRIBE_ENGINE=openai
-//        makes that the Whisper API as well).
-//   3. ElevenLabs         — $ELEVENLABS_API_KEY + `pip install elevenlabs`. No
+//   2. ElevenLabs         — $ELEVENLABS_API_KEY + `pip install elevenlabs`. No
 //        word timings → caller chains transcribeWav().
+//   3. OpenAI             — $OPENAI_API_KEY. Pure fetch, no Python. No word
+//        timings → caller chains transcribeWav() (HYPERFRAMES_TRANSCRIBE_ENGINE=openai
+//        makes that the Whisper API as well). After ElevenLabs so an existing
+//        ElevenLabs setup keeps its voice when an OpenAI key is also present.
 //   4. Kokoro-82M (local) — always available, via the published `hyperframes tts`
 //        CLI. No word timings → caller chains transcribeWav().
 //
@@ -63,8 +64,8 @@ export function pickProvider(userProvider) {
     return userProvider;
   }
   if (heygenAvailable()) return "heygen";
-  if (openaiAvailable()) return "openai";
-  return elevenlabsAvailable() ? "elevenlabs" : "kokoro";
+  if (elevenlabsAvailable()) return "elevenlabs";
+  return openaiAvailable() ? "openai" : "kokoro";
 }
 
 // ── voice resolution ──────────────────────────────────────────────────────────

@@ -9,7 +9,7 @@
 // The three capabilities degrade on ONE switch — whether HeyGen is configured
 // (credential present, NOT the CLI). This mirrors the table in ../SKILL.md:
 //
-//   TTS : HeyGen REST → OpenAI → ElevenLabs → Kokoro (CLI)
+//   TTS : HeyGen REST → ElevenLabs → OpenAI → Kokoro (CLI)
 //   BGM : HeyGen retrieve  → (no credential) Lyria/MusicGen generate
 //   SFX : HeyGen retrieve  → (no credential) bundled 19-file library
 //

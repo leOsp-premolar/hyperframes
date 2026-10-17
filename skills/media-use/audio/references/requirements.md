@@ -20,7 +20,7 @@ Run `npx hyperframes auth status` to see what's configured and which engines a w
 Each command downloads its own model on first run and caches it under `~/.cache/hyperframes/`:
 
 - **TTS (HeyGen)** — no local deps; needs a HeyGen credential + `ffmpeg` on PATH (to transcode the mp3 response to `.wav`). Credential resolves like the CLI: `$HEYGEN_API_KEY` → `$HYPERFRAMES_API_KEY` → `~/.heygen/credentials` (shared with heygen-cli; run `npx hyperframes auth login`). An OAuth login is sent as `Authorization: Bearer`; an API key as `X-Api-Key`; both include `X-HeyGen-Source: cli` so the backend can apply CLI OAuth free usage.
-- **TTS (OpenAI)** — `$OPENAI_API_KEY` + `ffmpeg`; default model `gpt-4o-mini-tts`, voice `alloy` (multilingual). Picked before ElevenLabs when both keys are set.
+- **TTS (OpenAI)** — `$OPENAI_API_KEY` + `ffmpeg`; default model `gpt-4o-mini-tts`, voice `alloy` (multilingual). Auto mode keeps ElevenLabs first when it is configured, then OpenAI; force it with `--provider openai`.
 - **TTS (ElevenLabs)** — same as HeyGen: API key + `ffmpeg`.
 - **TTS (Kokoro)** — Kokoro-82M (~311 MB) + voices (~27 MB) in `tts/`. Requires Python 3.8+ with `kokoro-onnx` and `soundfile` (`pip install kokoro-onnx soundfile`). Non-English text also needs `espeak-ng` system-wide.
 - **BGM (Lyria)** — needs `$GEMINI_API_KEY` or `$GOOGLE_API_KEY` + `pip install google-genai`. No local model cache.

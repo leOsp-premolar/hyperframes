@@ -1,15 +1,21 @@
 import { describe, expect, it } from "vitest";
 import { decideMusic, decideVoice, KOKORO_PIP, MUSICGEN_PIP } from "./providers.js";
 
-describe("decideVoice — mirrors the skill's heygen → openai → elevenlabs → kokoro order", () => {
+describe("decideVoice — mirrors the skill's heygen → elevenlabs → openai → kokoro order", () => {
   it("prefers HeyGen when configured", () => {
     const r = decideVoice({ hasHeygen: true, openai: true, elevenlabs: true, kokoro: true });
     expect(r.engine).toBe("heygen");
     expect(r.ready).toBe(true);
   });
 
-  it("prefers OpenAI over ElevenLabs when OPENAI_API_KEY is set", () => {
-    const r = decideVoice({ hasHeygen: false, openai: true, elevenlabs: true, kokoro: true });
+  it("keeps ElevenLabs ahead of OpenAI so an existing ElevenLabs setup is unchanged", () => {
+    expect(
+      decideVoice({ hasHeygen: false, openai: true, elevenlabs: true, kokoro: true }).engine,
+    ).toBe("elevenlabs");
+  });
+
+  it("uses OpenAI when its key is set and ElevenLabs is not usable", () => {
+    const r = decideVoice({ hasHeygen: false, openai: true, elevenlabs: false, kokoro: true });
     expect(r).toMatchObject({ engine: "openai", label: "OpenAI TTS", local: false, ready: true });
   });
 
