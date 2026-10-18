@@ -1,21 +1,18 @@
 // @vitest-environment node
-import { spawnSync } from "node:child_process";
 import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Hono } from "hono";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { findFfBinary } from "@hyperframes/parsers/ff-binaries";
 import { registerFileRoutes } from "./files";
 import { stubAdapter } from "./stubAdapter.test-helpers";
+import { ffmpeg, hasFfTools } from "./ffmpegMedia.test-helpers";
 
 const media = mkdtempSync(join(tmpdir(), "hf-upload-media-"));
 let project: string;
 
 beforeAll(() => {
-  if (!findFfBinary("ffmpeg")) return;
-  const ffmpeg = (...args: string[]) =>
-    spawnSync(findFfBinary("ffmpeg") ?? "ffmpeg", ["-v", "error", "-y", ...args]);
+  if (!hasFfTools) return;
   ffmpeg("-f", "lavfi", "-i", "testsrc2=size=64x48", "-frames:v", "1", join(media, "still.png"));
   ffmpeg(
     "-f",
@@ -53,7 +50,7 @@ function upload(names: string[], query = "") {
 
 const projectFiles = () => readdirSync(project).sort();
 
-describe.skipIf(!findFfBinary("ffmpeg") || !findFfBinary("ffprobe"))("POST /upload", () => {
+describe.skipIf(!hasFfTools)("POST /upload", () => {
   it("adds the good files of a batch and names why each other one was refused", async () => {
     const res = await upload(["clip.mp4", "broken.png", "broken.mp4", "notes.txt"], "?mediaOnly=1");
     expect(res.status).toBe(201);

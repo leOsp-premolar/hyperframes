@@ -33,6 +33,10 @@ beforeEach(() => {
   vi.clearAllMocks();
   requestedSources.length = 0;
   getDurationFromMetadata.mockResolvedValue(5);
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async () => new Response("x", { status: 206 })),
+  );
 });
 
 afterEach(() => {
@@ -40,6 +44,16 @@ afterEach(() => {
 });
 
 describe("media probe registry", () => {
+  it("does not open a file the server does not have", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response("gone", { status: 404 })),
+    );
+    expect(await probeMediaUrl("/missing.mp4")).toBeNull();
+    expect(getDurationFromMetadata).not.toHaveBeenCalled();
+    expect(dispose).not.toHaveBeenCalled();
+  });
+
   it("deduplicates and caches successful probes", async () => {
     const [first, second] = await Promise.all([
       probeMediaUrl("/video.mp4"),
@@ -65,8 +79,8 @@ describe("media probe registry", () => {
     );
 
     const probes = Array.from({ length: 5 }, (_, index) => probeMediaUrl(`/queued-${index}.mp4`));
-    await Promise.resolve();
-    await Promise.resolve();
+    await vi.waitFor(() => expect(getDurationFromMetadata).toHaveBeenCalledTimes(4));
+    await new Promise((r) => setTimeout(r, 10));
     expect(getDurationFromMetadata).toHaveBeenCalledTimes(4);
 
     resolvers[0]?.(5);

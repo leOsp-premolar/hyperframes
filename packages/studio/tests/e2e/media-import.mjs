@@ -5,11 +5,16 @@
 //
 //   bun run dev -- --port 5316 --strictPort
 //   STUDIO_URL="http://localhost:5316/#project/editor-workflow" node tests/e2e/media-import.mjs
-import { spawnSync } from "node:child_process";
 import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
-import { check, clickLeafText, runStudioGate, studioGateSetup } from "./editorWorkflowSteps.mjs";
+import {
+  check,
+  clickLeafText,
+  ffmpeg,
+  runStudioGate,
+  studioGateSetup,
+} from "./editorWorkflowSteps.mjs";
 
 const STUDIO_URL = process.env.STUDIO_URL;
 const projectDir = studioGateSetup(STUDIO_URL, "editor-workflow");
@@ -102,11 +107,6 @@ await runStudioGate({ studioUrl: STUDIO_URL, outDir: process.env.OUT_DIR }, asyn
     rmSync(workDir, { recursive: true, force: true });
   }
 });
-
-function ffmpeg(...args) {
-  const r = spawnSync("ffmpeg", ["-v", "error", "-y", ...args], { encoding: "utf8" });
-  if (r.status !== 0) throw new Error(`ffmpeg failed: ${r.stderr.slice(-300)}`);
-}
 
 /** Good and bad files beside the gate's clip; returns their paths. */
 function makeMedia(dir) {

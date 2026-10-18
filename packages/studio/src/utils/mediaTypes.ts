@@ -16,3 +16,10 @@ export const MEDIA_EXT = extensionPattern([...VIDEO_EXTS, ...AUDIO_EXTS, ...IMAG
 export function isMediaFile(path: string): boolean {
   return MEDIA_EXT.test(path);
 }
+
+/** The `accept` list of a file picker that offers only one kind of media. */
+export const MEDIA_ACCEPT: Record<"video" | "image" | "audio", string> = {
+  video: VIDEO_EXTS.map((ext) => `.${ext}`).join(","),
+  image: IMAGE_EXTS.map((ext) => `.${ext}`).join(","),
+  audio: AUDIO_EXTS.map((ext) => `.${ext}`).join(","),
+};

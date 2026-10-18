@@ -11,6 +11,7 @@ import { SaveQueuePausedBanner } from "./components/SaveQueuePausedBanner";
 import { ExternalFileConflictBanner } from "./components/ExternalFileConflictBanner";
 import { ProjectUnreachableBanner } from "./components/ProjectUnreachableBanner";
 import { CompositionMissingBanner } from "./components/CompositionMissingBanner";
+import { MissingMediaBanner } from "./components/MissingMediaBanner";
 import { useCaptionStore } from "./captions/store";
 import { useCaptionSync } from "./captions/hooks/useCaptionSync";
 import { usePersistentEditHistory } from "./hooks/usePersistentEditHistory";
@@ -533,6 +534,7 @@ export function StudioApp({ readOnlyPreview = false, readOnlyPreviewReason }: St
                 {sdkHandle.compositionMissing && activeCompPath && (
                   <CompositionMissingBanner path={activeCompPath} />
                 )}
+                <MissingMediaBanner />
                 <EditorShell
                   readOnlyPreview={readOnlyPreview}
                   readOnlyPreviewReason={readOnlyPreviewReason}

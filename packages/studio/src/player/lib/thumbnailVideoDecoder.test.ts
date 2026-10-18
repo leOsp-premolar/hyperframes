@@ -49,6 +49,10 @@ beforeEach(() => {
   source = `/clip-${++sources}.mp4`;
   vi.clearAllMocks();
   getKeyPacket.mockImplementation(async () => null);
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async () => new Response("x", { status: 206 })),
+  );
   vi.spyOn(URL, "createObjectURL")
     .mockReturnValueOnce("blob:one")
     .mockReturnValueOnce("blob:two")
@@ -83,6 +87,18 @@ describe("videoThumbnailTimestamps", () => {
 });
 
 describe("decodeVideoThumbnail", () => {
+  it("turns away a source that is not there before Mediabunny opens it", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response("gone", { status: 404 })),
+    );
+    await expect(
+      decodeVideoThumbnail({ source, frameCount: 1 }, new AbortController().signal),
+    ).rejects.toThrow("Video source cannot be read");
+    expect(input.getPrimaryVideoTrack).not.toHaveBeenCalled();
+    expect(dispose).not.toHaveBeenCalled();
+  });
+
   it("extracts sparse frames, returns object URLs, and disposes once", async () => {
     const decoded: number[][] = [];
     recordDecodes(decoded);

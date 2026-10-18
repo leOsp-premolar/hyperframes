@@ -2,6 +2,7 @@ import { memo, type MouseEvent } from "react";
 import type { TimelineElement } from "../store/playerStore";
 import { clipVolumeBadge, readClipEffects } from "./clipToolAttrs";
 import { useClipToolState } from "./useClipToolState";
+import { missingMediaFor, useMissingMediaStore } from "../../utils/missingMedia";
 
 function SpeakerGlyph({ muted }: { muted: boolean }) {
   return (
@@ -38,6 +39,8 @@ export const ClipBadges = memo(function ClipBadges({
   const effects = readClipEffects(state);
   const volume = clipVolumeBadge(state);
   const hasEffects = effects.length > 0;
+  const missing = useMissingMediaStore((s) => missingMediaFor(s.missing, el));
+  const replace = useMissingMediaStore((s) => s.replace);
   const openMenu = (event: MouseEvent) => {
     event.stopPropagation();
     onOpenMenu?.(event);
@@ -47,6 +50,20 @@ export const ClipBadges = memo(function ClipBadges({
       className="pointer-events-none absolute right-1.5 top-0.5 z-[31] flex max-w-[calc(100%-12px)] gap-1 overflow-hidden"
       data-testid="clip-badges"
     >
+      {missing && (
+        <span
+          className={`${BADGE_CLASS} pointer-events-auto shrink-0 cursor-pointer border-amber-400/60 text-amber-200`}
+          title={`${missing.path} can't be played. Click to replace it.`}
+          data-badge="missing"
+          onPointerDown={(event) => event.stopPropagation()}
+          onClick={(event) => {
+            event.stopPropagation();
+            replace?.(missing.path);
+          }}
+        >
+          Missing
+        </span>
+      )}
       {volume && (
         <span
           className={`${BADGE_CLASS} min-w-0 overflow-hidden border-white/20 text-white/90`}

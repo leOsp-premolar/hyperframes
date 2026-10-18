@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { TimelineElement } from "../store/playerStore";
 import { usePreviewIframeStore } from "../store/previewIframeStore";
 import { ClipBadges } from "./ClipBadges";
+import { useMissingMediaStore } from "../../utils/missingMedia";
 
 Object.defineProperty(globalThis, "IS_REACT_ACT_ENVIRONMENT", {
   configurable: true,
@@ -18,6 +19,7 @@ afterEach(() => {
   act(() => root?.unmount());
   root = null;
   usePreviewIframeStore.getState().setIframe(null);
+  useMissingMediaStore.getState().set([], null);
   document.body.innerHTML = "";
 });
 
@@ -102,5 +104,32 @@ describe("ClipBadges", () => {
     act(() => document.querySelector<HTMLElement>("[data-badge='fx']")?.click());
     expect(onOpenMenu).toHaveBeenCalledTimes(1);
     expect(onClipClick).not.toHaveBeenCalled();
+  });
+});
+
+describe("ClipBadges missing media", () => {
+  it("marks a clip whose file is missing, and a click opens the replacement picker", () => {
+    const replace = vi.fn();
+    useMissingMediaStore
+      .getState()
+      .set(
+        [{ path: "assets/talk.mp4", kind: "video", reason: "missing", clipIds: [], uses: 1 }],
+        replace,
+      );
+    render({ ...talk, src: "http://localhost:5190/api/projects/p/preview/assets/talk.mp4" });
+    expect(labels()).toEqual(["missing:Missing", "fx:fx"]);
+    act(() => document.querySelector<HTMLElement>("[data-badge='missing']")?.click());
+    expect(replace).toHaveBeenCalledWith("assets/talk.mp4");
+  });
+
+  it("leaves a clip whose file plays alone", () => {
+    useMissingMediaStore
+      .getState()
+      .set(
+        [{ path: "assets/other.mp4", kind: "video", reason: "missing", clipIds: [], uses: 1 }],
+        vi.fn(),
+      );
+    render({ ...talk, src: "/api/projects/p/preview/assets/talk.mp4" });
+    expect(labels()).toEqual(["fx:fx"]);
   });
 });

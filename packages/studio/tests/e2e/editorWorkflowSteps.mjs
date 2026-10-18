@@ -290,7 +290,7 @@ async function reloadKeepsEdit({ page, evidence, failures }) {
 }
 
 // 7. Export with the header button, as a user would, and follow that job to its end.
-async function exportWithHeaderButton({
+export async function exportWithHeaderButton({
   page,
   origin,
   projectId,
@@ -405,6 +405,11 @@ export async function clickLeafText(page, text) {
   await page.mouse.click(p.x, p.y);
 }
 
+/** Run ffmpeg quietly, overwriting its output; a failure throws with the end of its errors. */
+export function ffmpeg(...args) {
+  run("ffmpeg", ["-v", "error", "-y", ...args]);
+}
+
 function run(cmd, args) {
   const r = spawnSync(cmd, args, { encoding: "utf8" });
   if (r.status !== 0) throw new Error(`${cmd} failed: ${(r.stderr || "").slice(-400)}`);
@@ -484,7 +489,8 @@ function sseDataReader() {
   };
 }
 
-function framePsnr(a, at, b, bt) {
+/** How closely frame `at` of `a` matches frame `bt` of `b`, in dB (Infinity when identical). */
+export function framePsnr(a, at, b, bt) {
   const r = spawnSync(
     "ffmpeg",
     [

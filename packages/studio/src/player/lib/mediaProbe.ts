@@ -1,5 +1,6 @@
 import { authoredSrcPath, resolveMediaPreviewUrl } from "../components/thumbnailUtils";
 import { TIMELINE_VIEWPORT_BUDGETS } from "./timelineViewportBudgets";
+import { mediaSourceReachable } from "./mediaSourceReachable";
 
 export interface MediaProbeResult {
   duration: number;
@@ -52,7 +53,7 @@ function normalizeUrl(url: string): string {
 
 async function probeOne(url: string): Promise<MediaProbeResult | null> {
   const mb = await loadMediabunny();
-  if (!mb) return null;
+  if (!mb || !(await mediaSourceReachable(url))) return null;
 
   const input = new mb.Input({
     source: new mb.UrlSource(url),

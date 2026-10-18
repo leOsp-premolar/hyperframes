@@ -20,6 +20,7 @@ import { StudioAgentTools } from "../webmcp/StudioAgentTools";
 import type { TimelineDropPlacement } from "../player/components/timelineCallbacks";
 import type { TimelineProps } from "../player/components/TimelineTypes";
 import { Dock } from "./dock/Dock";
+import { useStudioMissingMedia } from "../hooks/useStudioMissingMedia";
 
 type RenderClipContent = (
   element: TimelineElement,
@@ -138,6 +139,7 @@ export const EditorShell = memo(function EditorShell({
   const { domEditSelection, domEditGroupSelections } = useDomEditSelectionContext();
   const selectedElementId = usePlayerStore((state) => state.selectedElementId);
   const selectedElementIds = usePlayerStore((state) => state.selectedElementIds);
+  const missingMediaMenu = useStudioMissingMedia();
   const reportTimelineSelectionNotFound = useCallback(() => {
     showToast("The selected clip is not available in the preview yet.", "info");
   }, [showToast]);
@@ -212,7 +214,7 @@ export const EditorShell = memo(function EditorShell({
               onPasteClip={onPasteClip}
               onDuplicateClip={onDuplicateClip}
               canPasteClip={canPasteClip}
-              clipMenuItems={clipMenuItems}
+              clipMenuItems={clipMenuItems ?? missingMediaMenu}
               splitShortcut={splitShortcut}
               previewOverlay={
                 <PreviewOverlays

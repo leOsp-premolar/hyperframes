@@ -1040,34 +1040,51 @@ function directoryReal(entry: Dirent, full: string): string | null {
   }
 }
 
+/** One project text file whose references a path change rewrites: its text before and after. */
+export interface ReferenceUpdate {
+  file: string;
+  content: string;
+  updated: string;
+  mode: number;
+}
+
 /**
- * After a rename, update all references to the old path in project files.
+ * The text files a move from `oldPath` to `newPath` changes, without writing any of them.
  * Scans HTML, CSS, JS, and JSON files for the old path and replaces it where it names that path.
  */
-function updateReferences(
+export function planReferenceUpdates(
   projectDir: string,
   oldPath: string,
   newPath: string,
   isDirectory: boolean,
-): number {
+): ReferenceUpdate[] {
   const textFiles = walkFiles(projectDir, (name) =>
     /\.(html|css|js|jsx|ts|tsx|json|mjs|cjs|md|mdx)$/i.test(name),
   );
 
   const rewrite = referenceRewriter(oldPath, newPath, isDirectory, projectPaths(projectDir));
-  let updatedCount = 0;
+  const updates: ReferenceUpdate[] = [];
   for (const file of textFiles) {
     if (!isSafePath(projectDir, file) || isPrivateProjectFile(projectDir, file)) continue;
     const content = readableText(file);
     if (content === null) continue;
 
     const updated = rewrite(content, referenceSyntax(file));
-    if (updated !== content) {
-      replaceFileAtomically(file, updated, statSync(file).mode);
-      updatedCount++;
-    }
+    if (updated !== content) updates.push({ file, content, updated, mode: statSync(file).mode });
   }
-  return updatedCount;
+  return updates;
+}
+
+/** After a rename, update all references to the old path in project files. */
+function updateReferences(
+  projectDir: string,
+  oldPath: string,
+  newPath: string,
+  isDirectory: boolean,
+): number {
+  const updates = planReferenceUpdates(projectDir, oldPath, newPath, isDirectory);
+  for (const { file, updated, mode } of updates) replaceFileAtomically(file, updated, mode);
+  return updates.length;
 }
 
 // ── GSAP script extraction ──────────────────────────────────────────────────
