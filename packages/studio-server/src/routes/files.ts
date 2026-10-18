@@ -32,7 +32,10 @@ import { isAudioFile } from "../helpers/mime.js";
 import { lengthIsTimeline } from "../helpers/compositionInputs.js";
 import { createFileAtomically, replaceFileAtomically } from "@hyperframes/core/atomic-file";
 import { generateWaveformCache } from "../helpers/waveform.js";
-import { validateUploadedMediaBuffer } from "../helpers/mediaValidation.js";
+import {
+  unsupportedImportReason,
+  validateUploadedMediaBuffer,
+} from "../helpers/mediaValidation.js";
 import {
   folderGone,
   isInHiddenOrVendorDir,
@@ -2662,10 +2665,18 @@ async function foldAtomicCutFile(
 
 export const MAX_UPLOAD_BYTES = 500 * 1024 * 1024;
 
+interface UploadOptions {
+  /** Refuse files the media import cannot use (the Assets panel and timeline drops). */
+  mediaOnly?: boolean;
+  /** Create the target folder; called only once a file is accepted, so a refused batch adds nothing. */
+  ensureTargetDir: () => void;
+}
+
 async function processUploadedFiles(
   formData: FormData,
   targetDir: string,
   projectDir: string,
+  { mediaOnly = false, ensureTargetDir }: UploadOptions,
 ): Promise<{
   uploaded: string[];
   skipped: string[];
@@ -2700,6 +2711,12 @@ async function processUploadedFiles(
     // Strip path separators — browsers may include directory components
     const name = value.name.split("/").pop()?.split("\\").pop() ?? "";
     if (!name || name.includes("\0") || name.includes("..")) continue;
+
+    const unsupported = mediaOnly ? unsupportedImportReason(name) : null;
+    if (unsupported) {
+      invalid.push({ name, reason: unsupported });
+      continue;
+    }
 
     // Reject individual files that exceed the size limit
     if (value.size > MAX_UPLOAD_BYTES) {
@@ -2741,6 +2758,7 @@ async function processUploadedFiles(
       continue;
     }
 
+    ensureTargetDir();
     // Reading the upload yields: another request can claim the selected name.
     // Only exclusive creation authorizes a write; retry collisions without
     // following a newly planted link or overwriting another upload.
@@ -3738,8 +3756,17 @@ export function registerFileRoutes(api: Hono, adapter: StudioApiAdapter): void {
       if (!targetDir) return c.json({ error: "forbidden" }, 403);
 
       const formData = await c.req.formData();
-      mkdirWithinProject(project.dir, targetDir);
-      const result = await processUploadedFiles(formData, targetDir, project.dir);
+      let result: Awaited<ReturnType<typeof processUploadedFiles>>;
+      try {
+        result = await processUploadedFiles(formData, targetDir, project.dir, {
+          mediaOnly: c.req.query("mediaOnly") === "1",
+          ensureTargetDir: () => mkdirWithinProject(project.dir, targetDir),
+        });
+      } catch (error) {
+        // The target folder is made after the read, which a renamed project can outlast.
+        if (folderGone(project.dir)) return projectDirMissing(c);
+        throw error;
+      }
       if (folderGone(project.dir)) return projectDirMissing(c);
 
       return c.json(

@@ -289,3 +289,67 @@ describe("useFileManager uploads", () => {
     );
   });
 });
+
+describe("useFileManager uploads", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  async function uploadWith(
+    answer: Record<string, unknown>,
+    call: (manager: ReturnType<typeof useFileManager>) => Promise<string[]>,
+  ) {
+    const fetchMock = vi.fn(async (_url: string, _init?: RequestInit) =>
+      Response.json(
+        { ok: true, files: [], skipped: [], invalid: [], unchecked: [], ...answer },
+        {
+          status: 201,
+        },
+      ),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const showToast = vi.fn();
+    const { manager, root } = await mountTestFileManager("project-a", showToast);
+    let files: string[] = [];
+    await act(async () => {
+      files = await call(manager);
+    });
+    act(() => root.unmount());
+    return { url: String(fetchMock.mock.calls[0]?.[0]), files, showToast };
+  }
+  const clip = () => [new File(["x"], "clip.mp4")];
+
+  it("asks the server to refuse non-media files for a media import", async () => {
+    const { url } = await uploadWith({ files: ["clip.mp4"] }, (m) =>
+      m.handleImportFiles(clip(), undefined, { mediaOnly: true }),
+    );
+    expect(url).toBe("/api/projects/project-a/upload?mediaOnly=1");
+  });
+
+  it("keeps a plain upload as it was, folder included", async () => {
+    expect((await uploadWith({}, (m) => m.handleImportFiles(clip()))).url).toBe(
+      "/api/projects/project-a/upload",
+    );
+    expect((await uploadWith({}, (m) => m.handleImportFiles(clip(), "assets/b roll"))).url).toBe(
+      "/api/projects/project-a/upload?dir=assets%2Fb+roll",
+    );
+  });
+
+  it("names every refused file and why, and returns only what was added", async () => {
+    const { files, showToast } = await uploadWith(
+      {
+        files: ["clip.mp4"],
+        invalid: [
+          {
+            name: "broken.png",
+            reason: "could not be read: the file is damaged or is not really PNG",
+          },
+          { name: "notes.txt", reason: ".txt files can't be imported" },
+        ],
+      },
+      (m) => m.handleImportFiles(clip(), undefined, { mediaOnly: true }),
+    );
+    expect(files).toEqual(["clip.mp4"]);
+    expect(showToast).toHaveBeenCalledWith(
+      "Not added: broken.png (could not be read: the file is damaged or is not really PNG), notes.txt (.txt files can't be imported)",
+    );
+  });
+});

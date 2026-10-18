@@ -388,7 +388,7 @@ function checkAudio(outputPath, sourcePath, evidence, failures) {
 }
 
 /** Dock tabs and toolbar buttons answer pointer events, so press them with the real mouse. */
-async function clickLeafText(page, text) {
+export async function clickLeafText(page, text) {
   const handle = await page.waitForFunction(
     (t) => {
       const el = [...document.querySelectorAll("*")].find(

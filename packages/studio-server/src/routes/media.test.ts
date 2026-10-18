@@ -12,6 +12,8 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { spawnSync } from "node:child_process";
+import { findFfBinary } from "@hyperframes/parsers/ff-binaries";
 import { registerMediaRoutes } from "./media";
 import type { MediaProcessingJobState, StudioApiAdapter } from "../types";
 
@@ -71,6 +73,35 @@ function completeJob(opts: Parameters<NonNullable<StudioApiAdapter["startBackgro
 }
 
 describe("registerMediaRoutes", () => {
+  it.skipIf(!findFfBinary("ffmpeg") || !findFfBinary("ffprobe"))(
+    "reports an audio asset's codec and length by default, for the Assets panel",
+    async () => {
+      const { app, projectDir } = createAdapter();
+      const wav = join(projectDir, "assets", "tone.wav");
+      const made = spawnSync(findFfBinary("ffmpeg") ?? "ffmpeg", [
+        "-v",
+        "error",
+        "-f",
+        "lavfi",
+        "-i",
+        "sine=duration=0.5:sample_rate=48000",
+        wav,
+      ]);
+      expect(made.status).toBe(0);
+      const response = await app.request(
+        "http://localhost/projects/demo/media/metadata?path=assets%2Ftone.wav",
+      );
+      expect(await response.json()).toMatchObject({
+        path: "assets/tone.wav",
+        metadata: {
+          kind: "audio",
+          durationSeconds: 0.5,
+          audio: { codecName: "pcm_s16le", sampleRate: 48000, channels: 1 },
+        },
+      });
+    },
+  );
+
   it("returns metadata for a project-local media asset", async () => {
     const probe = vi.fn(async () => ({
       kind: "video" as const,

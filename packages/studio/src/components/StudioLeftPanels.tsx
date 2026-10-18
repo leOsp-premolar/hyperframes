@@ -84,6 +84,10 @@ export const StudioLeftPanels = memo(function StudioLeftPanels({
   const importFiles = async (files: FileList, dir?: string) => {
     await handleImportFiles(files, dir);
   };
+  // The Assets panel can only use media and fonts; the file tree uploads anything.
+  const importMedia = async (files: FileList) => {
+    await handleImportFiles(files, undefined, { mediaOnly: true });
+  };
   const lintButton = (
     <SidebarLintButton
       onLint={onLint}
@@ -114,7 +118,7 @@ export const StudioLeftPanels = memo(function StudioLeftPanels({
           <AssetsTab
             projectId={projectId}
             assets={assets}
-            onImport={importFiles}
+            onImport={importMedia}
             onDelete={handleDeleteFile}
             onRename={handleRenameFile}
             onAddAssetToTimeline={onAddAssetToTimeline}

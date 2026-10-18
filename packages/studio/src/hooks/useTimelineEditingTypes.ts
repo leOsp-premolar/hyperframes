@@ -1,3 +1,4 @@
+import type { UploadOptions } from "./useFileManager";
 import type { MutableRefObject, RefObject } from "react";
 import type { Composition } from "@hyperframes/sdk";
 import type { TimelineElement } from "../player";
@@ -37,7 +38,11 @@ export interface UseTimelineEditingOptions {
   reloadPreview: () => void;
   previewIframeRef: RefObject<HTMLIFrameElement | null>;
   pendingTimelineEditPathRef: MutableRefObject<Set<string>>;
-  uploadProjectFiles: (files: Iterable<File>, dir?: string) => Promise<string[]>;
+  uploadProjectFiles: (
+    files: Iterable<File>,
+    dir?: string,
+    options?: UploadOptions,
+  ) => Promise<string[]>;
   isRecordingRef?: RefObject<boolean>;
   /** Stage 7 §3.2: SDK session for routing timing ops through setTiming. */
   sdkSession?: Composition | null;
