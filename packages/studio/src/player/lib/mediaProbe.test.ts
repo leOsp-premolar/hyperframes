@@ -24,6 +24,7 @@ vi.mock("mediabunny", () => ({
     getDurationFromMetadata = getDurationFromMetadata;
     getPrimaryVideoTrack = vi.fn(async () => ({ displayWidth: 640, displayHeight: 360 }));
     getAudioTracks = vi.fn(async () => []);
+    getFormat = async () => "mp4";
     dispose = dispose;
   },
 }));

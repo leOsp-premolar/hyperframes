@@ -8,6 +8,7 @@ const canvasesAtTimestamps = vi.fn();
 const getKeyPacket = vi.fn(async (_time: number) => null as { timestamp: number } | null);
 const input = {
   getPrimaryVideoTrack: vi.fn(),
+  getFormat: vi.fn(async (): Promise<unknown> => "mp4"),
   dispose,
 };
 
@@ -18,6 +19,7 @@ vi.mock("mediabunny", () => ({
   },
   Input: class {
     getPrimaryVideoTrack = input.getPrimaryVideoTrack;
+    getFormat = input.getFormat;
     dispose = input.dispose;
   },
   CanvasSink: class {
@@ -96,6 +98,17 @@ describe("decodeVideoThumbnail", () => {
       decodeVideoThumbnail({ source, frameCount: 1 }, new AbortController().signal),
     ).rejects.toThrow("Video source cannot be read");
     expect(input.getPrimaryVideoTrack).not.toHaveBeenCalled();
+    expect(dispose).not.toHaveBeenCalled();
+  });
+
+  it("leaves a file that cannot be opened undisposed, so no rejection goes unhandled", async () => {
+    const unreadable = new Error("Input has an unsupported or unrecognizable format.");
+    input.getPrimaryVideoTrack.mockRejectedValueOnce(unreadable);
+    input.getFormat.mockRejectedValueOnce(unreadable);
+    await expect(
+      decodeVideoThumbnail({ source, frameCount: 1 }, new AbortController().signal),
+    ).rejects.toThrow("unsupported");
+    await new Promise((resolve) => setTimeout(resolve, 0));
     expect(dispose).not.toHaveBeenCalled();
   });
 

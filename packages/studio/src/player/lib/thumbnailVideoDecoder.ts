@@ -5,6 +5,7 @@ import {
   type ThumbnailLoadedResult,
   type ThumbnailValue,
 } from "./thumbnailScheduler";
+import { disposeMediaInput } from "./disposeMediaInput";
 
 export interface VideoThumbnailDecodeRequest {
   source: string;
@@ -327,6 +328,6 @@ async function decodeMissingFrames(
     }
     return loadedResult(resources, info.aspect, budgets, timestamps.length);
   } finally {
-    input.dispose();
+    disposeMediaInput(input);
   }
 }

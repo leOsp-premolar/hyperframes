@@ -1,6 +1,7 @@
 import { authoredSrcPath, resolveMediaPreviewUrl } from "../components/thumbnailUtils";
 import { TIMELINE_VIEWPORT_BUDGETS } from "./timelineViewportBudgets";
 import { mediaSourceReachable } from "./mediaSourceReachable";
+import { disposeMediaInput } from "./disposeMediaInput";
 
 export interface MediaProbeResult {
   duration: number;
@@ -77,7 +78,7 @@ async function probeOne(url: string): Promise<MediaProbeResult | null> {
   } catch {
     return null;
   } finally {
-    input.dispose();
+    disposeMediaInput(input);
   }
 }
 

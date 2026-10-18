@@ -6,16 +6,16 @@ previous one's tests.
 
 ## Stages
 
-| Stage | Branch                      | State   | Scope                                                                    |
-| ----- | --------------------------- | ------- | ------------------------------------------------------------------------ |
-| S0    | `studio/s0-e2e-workflow`    | Done    | Browser gate: import, place, split, trim, undo/redo, reload, export      |
-| S4    | `studio/s4-create-project`  | Done    | New project from the header or the empty start screen; `POST /projects`  |
-| S2    | `studio/s2-media-metadata`  | Done    | Media metadata on asset cards; upload validation                         |
-| S3    | `studio/s3-missing-media`   | Review  | Missing media detection and replacement                                  |
-| S1    | `studio/s1-export-options`  | Review  | Export the in/out range; audio-only export; GIF and PNG sequence options |
-| S5    | `studio/s5-slip-roll`       | Review  | Slip and roll editing                                                    |
-| S6    | `studio/s6-track-lock-solo` | Review  | Track lock and solo                                                      |
-| S7    |                             | Planned | Browser verification of keyframes and playback                           |
+| Stage | Branch                         | State  | Scope                                                                    |
+| ----- | ------------------------------ | ------ | ------------------------------------------------------------------------ |
+| S0    | `studio/s0-e2e-workflow`       | Done   | Browser gate: import, place, split, trim, undo/redo, reload, export      |
+| S4    | `studio/s4-create-project`     | Done   | New project from the header or the empty start screen; `POST /projects`  |
+| S2    | `studio/s2-media-metadata`     | Done   | Media metadata on asset cards; upload validation                         |
+| S3    | `studio/s3-missing-media`      | Review | Missing media detection and replacement                                  |
+| S1    | `studio/s1-export-options`     | Review | Export the in/out range; audio-only export; GIF and PNG sequence options |
+| S5    | `studio/s5-slip-roll`          | Review | Slip and roll editing                                                    |
+| S6    | `studio/s6-track-lock-solo`    | Review | Track lock and solo                                                      |
+| S7    | `studio/s7-keyframes-playback` | Review | Browser verification of keyframes and playback                           |
 
 ## Known limitations to plan for
 
@@ -187,3 +187,42 @@ Limits:
   track then shows as unlocked until it is locked again.
 - **Only the timeline is covered.** Edits from the canvas, the inspector and the code view were
   not tested against the lock.
+
+Recorded with S7, for review.
+
+What the browser test covers (`test:keyframes-playback`, one red box): "Add keyframe at playhead"
+keys its position at 0s; at 2s, with auto-key on (the default), a canvas drag keys it 200px to
+the right. The file then holds one `keyframes` tween (0% and 100% over 2s) and the timeline two
+diamonds, at 0s and 2s. Seeking shows the box between the keys at 1s and held at the last one
+after it. Playing runs at real time (measured 1.00x) and at 2x (2.00x), the box never moving
+backwards; Pause holds the time and the picture still; loop playback starts again at 0; the
+arrow key steps one frame (1/30s) and moves the box. Undo removes the second key, redo restores
+it, a reload reads both back, and the export draws the box at the same pixel as the preview at
+0s, 1s and 3s.
+
+Found and fixed:
+
+- **The playhead sat between frames after a ruler click or a pause.** The preview shows the
+  frame a seek lands on (the runtime rounds it down to its frame grid), but Studio kept the time
+  under the pointer (1.514s with 1.5s on screen), and after a pause the time playback stopped at
+  (1.568s). A keyframe or a split made there landed between frames, and the toolbar did not
+  recognise a key added at the playhead as being at the playhead. Studio now keeps the frame the
+  preview shows, and a pause settles on that frame.
+- **A video that could not be opened left an unhandled error behind.** Mediabunny's
+  `Input.dispose()` chains onto the failed open without a catch; Studio now disposes an input
+  only once it has opened (Mediabunny frees an unopened one when it is collected). The S3 browser
+  test failed now and then on this after a replacement.
+
+Limits:
+
+- **Only position keyframes are driven through the UI,** by a canvas drag. Opacity in the
+  inspector writes CSS, not keyframes, and the test did not reach the inspector's X and Y fields
+  for this element; other properties, eases and the keyframe menu are not exercised.
+- **Playback rate is measured over about a second,** with 20% tolerance, in a headless browser;
+  dropped frames under load are not measured.
+- **Frame stepping and frame snapping use 30 fps,** the fixture's rate; a 24 or 60 fps
+  composition is not covered.
+- **Why one of two simultaneous reads of the replaced video in the S3 test failed** is not known;
+  the failure is now handled and the other read draws the filmstrip.
+- **The fixture loads GSAP from its own folder,** since the container's browser cannot reach
+  the CDN the other fixtures use.

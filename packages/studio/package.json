@@ -85,6 +85,7 @@
     "test:export-options": "node tests/e2e/export-options.mjs",
     "test:slip-roll": "node tests/e2e/slip-roll.mjs",
     "test:track-lock-solo": "node tests/e2e/track-lock-solo.mjs",
+    "test:keyframes-playback": "node tests/e2e/keyframes-playback.mjs",
     "test:missing-media": "node tests/e2e/missing-media.mjs",
     "bench:timeline-bulk-actions": "node tests/e2e/timeline-bulk-actions.mjs",
     "test:timeline-virtualization": "TIMELINE_ROW_VIRTUALIZATION=on TIMELINE_ELEMENT_COUNT=50000 node tests/e2e/timeline-virtualization.mjs",
