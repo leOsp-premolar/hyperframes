@@ -113,9 +113,15 @@ function renderResizeHarness(
         started: false,
       };
     },
-    startResize(element: TimelineElement, edge: "start" | "end", pointerId = 0) {
+    startResize(
+      element: TimelineElement,
+      edge: "start" | "end",
+      pointerId = 0,
+      extra: Pick<ResizingClipState, "mode" | "rollPartnerKey"> = {},
+    ) {
       act(() => {
         apply({
+          ...extra,
           pointerId,
           element,
           edge,
@@ -572,6 +578,108 @@ describe("useTimelineClipDrag — trim guide and preview frame", () => {
     expect(clip.previewStart + clip.previewDuration).toBeCloseTo(3.1, 3);
     expect(clip).toMatchObject({ snapTime: null, snapType: null });
     expect(previewFrame()).toBeCloseTo(3.1 - 1 / 30, 3);
+    h.unmount();
+  });
+});
+
+describe("useTimelineClipDrag — slip and roll", () => {
+  it("slips the grabbed clip's source and commits it as one batch, timing untouched", async () => {
+    const a = el("a", {
+      start: 1,
+      duration: 2,
+      playbackStart: 3,
+      sourceDuration: 10,
+      kind: "video",
+    });
+    const h = renderResizeHarness([a], ["a"]);
+    h.startResize(a, "start", 0, { mode: "slip" });
+    h.movePointer(50);
+    expect(h.getResizeProjection()).toEqual([
+      expect.objectContaining({ key: "a", start: 1, duration: 2, playbackStart: 2.5 }),
+    ]);
+    expect(h.storeById("a").playbackStart).toBe(3);
+    // The preview cannot show the slipped frame before it is saved, so it shows none.
+    expect(usePreviewFrameStore.getState().time).toBeNull();
+    await h.dropPointer();
+    expect(h.onResizeElement).not.toHaveBeenCalled();
+    expect(h.onResizeElements).toHaveBeenCalledWith(
+      [expect.objectContaining({ element: a, start: 1, duration: 2, playbackStart: 2.5 })],
+      { label: "Slip clip" },
+    );
+    expect(h.storeById("a")).toMatchObject({ start: 1, duration: 2, playbackStart: 2.5 });
+    h.unmount();
+  });
+
+  it("rolls the edit point between two touching clips in one batch", async () => {
+    const left = el("l", {
+      start: 0,
+      duration: 2,
+      playbackStart: 0,
+      sourceDuration: 10,
+      kind: "video",
+    });
+    const right = el("r", {
+      start: 2,
+      duration: 3,
+      playbackStart: 1,
+      sourceDuration: 10,
+      kind: "video",
+    });
+    const h = renderResizeHarness([left, right], ["l"]);
+    h.startResize(left, "end", 0, { mode: "roll", rollPartnerKey: "r" });
+    await h.moveAndDropPointer(50);
+    expect(h.onResizeElements).toHaveBeenCalledWith(
+      [
+        expect.objectContaining({
+          element: left,
+          start: 0,
+          duration: 2.5,
+          playbackStart: undefined,
+        }),
+        // Saved without in-points: the save moves b's own in-point by the start shift.
+        expect.objectContaining({
+          element: right,
+          start: 2.5,
+          duration: 2.5,
+          playbackStart: undefined,
+        }),
+      ],
+      { label: "Roll edit" },
+    );
+    expect(h.storeById("r")).toMatchObject({ start: 2.5, duration: 2.5, playbackStart: 1.5 });
+    h.unmount();
+  });
+
+  it("puts a rolled pair back when the batch is refused", async () => {
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const left = el("l", { start: 0, duration: 2 });
+    const right = el("r", { start: 2, duration: 3 });
+    const h = renderResizeHarness([left, right], ["l"]);
+    h.onResizeElements.mockRejectedValueOnce(new Error("save failed"));
+    h.startResize(left, "end", 0, { mode: "roll", rollPartnerKey: "r" });
+    await h.moveAndDropPointer(50);
+    await act(async () => Promise.resolve());
+    expect(h.onResizeElements).toHaveBeenCalledTimes(1);
+    expect(h.storeById("l").duration).toBe(2);
+    expect(h.storeById("r")).toMatchObject({ start: 2, duration: 3 });
+    errorSpy.mockRestore();
+    h.unmount();
+  });
+
+  it("Escape abandons a slip without saving", () => {
+    const a = el("a", {
+      start: 1,
+      duration: 2,
+      playbackStart: 3,
+      sourceDuration: 10,
+      kind: "video",
+    });
+    const h = renderResizeHarness([a], ["a"]);
+    h.startResize(a, "start", 0, { mode: "slip" });
+    h.movePointer(50);
+    h.pressEscape();
+    expect(h.onResizeElements).not.toHaveBeenCalled();
+    expect(h.storeById("a").playbackStart).toBe(3);
     h.unmount();
   });
 });

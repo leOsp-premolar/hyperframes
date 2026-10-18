@@ -73,7 +73,8 @@ export interface TimelineEditCallbacks {
       duration: number;
       playbackStart?: number;
     }>,
-    options?: { coalesceKey?: string },
+    /** `label` names the undo entry (a slip or a roll) instead of the generic resize. */
+    options?: { coalesceKey?: string; label?: string },
   ) => Promise<void> | void;
   /**
    * `displayNumber` is the row the CLICKED control announced. It travels with

@@ -206,6 +206,19 @@ export function dispatchPlainKey(event: KeyboardEvent, key: string, cb: HotkeyCa
     return;
   }
 
+  // Y slips a clip's source under it, U rolls the edit between two clips; each toggles back.
+  if (
+    (key === STUDIO_PLAIN_KEYS.slip || key === STUDIO_PLAIN_KEYS.roll) &&
+    !event.shiftKey &&
+    !event.altKey
+  ) {
+    event.preventDefault();
+    const tool = key === STUDIO_PLAIN_KEYS.slip ? "slip" : "roll";
+    const { activeTool, setActiveTool } = usePlayerStore.getState();
+    setActiveTool(activeTool === tool ? "select" : tool);
+    return;
+  }
+
   if (key === "v" && !event.shiftKey && !event.altKey) {
     event.preventDefault();
     usePlayerStore.getState().setActiveTool("select");
@@ -235,7 +248,7 @@ export function dispatchPlainKey(event: KeyboardEvent, key: string, cb: HotkeyCa
   if (event.key === "Escape") {
     const { activeTool, selectedElementId, setActiveTool, setSelectedElementId } =
       usePlayerStore.getState();
-    if (activeTool === "razor") {
+    if (activeTool !== "select") {
       if (selectedElementId) setSelectedElementId(null);
       else setActiveTool("select");
       event.preventDefault();

@@ -65,6 +65,9 @@ export interface ResizingClipState {
   }[];
   started: boolean;
   altKey?: boolean;
+  /** A slip (source slides under the clip) or roll (edit point with `rollPartnerKey`); else a trim. */
+  mode?: "slip" | "roll";
+  rollPartnerKey?: string;
 }
 
 export interface BlockedClipState {

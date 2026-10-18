@@ -13,7 +13,7 @@ previous one's tests.
 | S2    | `studio/s2-media-metadata` | Done    | Media metadata on asset cards; upload validation                         |
 | S3    | `studio/s3-missing-media`  | Review  | Missing media detection and replacement                                  |
 | S1    | `studio/s1-export-options` | Review  | Export the in/out range; audio-only export; GIF and PNG sequence options |
-| S5    |                            | Planned | Slip and roll editing                                                    |
+| S5    | `studio/s5-slip-roll`      | Review  | Slip and roll editing                                                    |
 | S6    |                            | Planned | Track lock and solo                                                      |
 | S7    |                            | Planned | Browser verification of keyframes and playback                           |
 
@@ -126,3 +126,35 @@ Limits:
 - **Fixed in passing for S3:** the check that keeps Mediabunny away from missing videos now also
   refuses an HTML page answering for one (the development server's fallback for a path it does
   not have). That case let the S3 browser test fail now and then with the same unhandled error.
+
+Recorded with S5, for review.
+
+How slip and roll work: two new timeline tools, in the tool menu and on Y (slip) and U (roll),
+each key again or Escape returning to Select. Slip: drag a video, audio or composition clip and
+its source slides under it; start and length stay, only the in-point (`data-media-start`)
+changes, within the source when its length is known. Linked partners slip together. Roll: drag
+the edge where two clips on one track touch; the left clip ends and the right one starts at the
+new cut, the right clip's in-point following, so the pair's length and everything after it stay.
+Both reuse the trim gesture's preview, commit and rollback, and save as one undo entry named
+"Slip clip" or "Roll edit". The roll saves the right clip's in-point as the file's own value
+moved by the shift, not a value held in the timeline.
+
+Fixed in passing (upstream): a re-read timeline whose only change was a clip's in-point was
+thrown away, so after undoing an in-point change the timeline kept the old value and the next
+edit could write it back. The in-point now counts as a change.
+
+Limits:
+
+- **No two-up monitor while slipping.** The preview cannot show the new in-point until it is
+  saved, so it holds still during a slip (a roll shows the frame at the cut).
+- **A slip started within a moment of an undo** can start from the in-point before the undo,
+  until the timeline has re-read the file (a fraction of a second); a roll does not depend on it.
+- **Roll leaves linked clips alone,** since rolling one half of a linked video and audio pair
+  would pull it out of sync; unlink first, or trim both.
+- **Roll needs touching clips on one track**; an edge with a gap or on another track does not
+  roll. Each clip keeps at least 0.1s.
+- **No snapping while slipping or rolling.**
+- **A source of unknown length bounds a slip at its start only.** Until the media probe reports
+  how long a source is, a slip can slide past its end, leaving the tail of the clip without
+  picture or sound.
+- **Images, text and shapes do not slip;** they have no source to slide.

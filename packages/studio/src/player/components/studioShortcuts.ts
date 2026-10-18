@@ -5,6 +5,8 @@ export const STUDIO_PLAIN_KEYS = {
   record: "r",
   addKeyframe: "k",
   audioGain: "g",
+  slip: "y",
+  roll: "u",
 } as const;
 
 export interface ShortcutHint {
@@ -56,6 +58,11 @@ export const DEFAULT_SHORTCUT_SECTIONS: readonly ShortcutSection[] = [
       { key: SPLIT_SHORTCUT_HINT, label: "Split clip at playhead" },
       { key: hintKey(STUDIO_PLAIN_KEYS.audioGain), label: "Audio Gain for clips with sound" },
       { key: "⇧Click", label: "Razor tool: split all tracks" },
+      {
+        key: hintKey(STUDIO_PLAIN_KEYS.slip),
+        label: "Slip tool: drag a clip to change its in-point",
+      },
+      { key: hintKey(STUDIO_PLAIN_KEYS.roll), label: "Roll tool: drag a cut between two clips" },
       { key: "[", label: "Select clips starting before the playhead" },
       { key: "]", label: "Select clips running at or after the playhead" },
       { key: "⌘G", label: "Group elements" },

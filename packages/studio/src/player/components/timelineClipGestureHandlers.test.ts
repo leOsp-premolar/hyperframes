@@ -64,3 +64,88 @@ describe("hand-editing a multi-selection", () => {
     expect(blockedClipRef.current).toBeNull();
   });
 });
+
+describe("slip and roll tools", () => {
+  const video = (
+    id: string,
+    start: number,
+    extra: Partial<TimelineElement> = {},
+  ): TimelineElement => ({
+    id,
+    key: id,
+    domId: id,
+    tag: "video",
+    kind: "video",
+    start,
+    duration: 2,
+    track: 0,
+    playbackStart: 1,
+    ...extra,
+  });
+
+  function press(
+    tool: "slip" | "roll",
+    target: TimelineElement,
+    elements: TimelineElement[],
+    where: "body" | "start" | "end",
+  ) {
+    usePlayerStore.getState().setElements(elements);
+    usePlayerStore.getState().setActiveTool(tool);
+    const setResizingClip = vi.fn();
+    const setDraggedClip = vi.fn();
+    const deps = {
+      pps: 100,
+      onMoveElement: vi.fn(),
+      onResizeElement: vi.fn(),
+      blockedClipRef: { current: null },
+      suppressClickRef: { current: false },
+      scrollRef: { current: null },
+      setShowPopover: vi.fn(),
+      setRangeSelection: vi.fn(),
+      setResizingClip,
+      setDraggedClip,
+      setSelectedElementId: vi.fn(),
+    } as unknown as ClipGestureDeps;
+    const handlers = createClipGestureHandlers(target, target.id, target, capabilities, deps);
+    const event = {
+      button: 0,
+      clientX: 50,
+      clientY: 5,
+      pointerId: 1,
+      stopPropagation: vi.fn(),
+      currentTarget: { getBoundingClientRect: () => ({ left: 0, width: 100 }) },
+    } as unknown as ReactPointerEvent;
+    if (where === "body") handlers.onPointerDown(event);
+    else handlers.onResizeStart(where, event);
+    return { setResizingClip, setDraggedClip };
+  }
+
+  it("slips a media clip from anywhere on it, never moving it", () => {
+    const a = video("a", 0);
+    const { setResizingClip, setDraggedClip } = press("slip", a, [a], "body");
+    expect(setResizingClip).toHaveBeenCalledWith(
+      expect.objectContaining({ mode: "slip", element: a }),
+    );
+    expect(setDraggedClip).not.toHaveBeenCalled();
+  });
+
+  it("has nothing to slip on a still image", () => {
+    const still = video("i", 0, { kind: "image", tag: "img" });
+    const { setResizingClip, setDraggedClip } = press("slip", still, [still], "body");
+    expect(setResizingClip).not.toHaveBeenCalled();
+    expect(setDraggedClip).not.toHaveBeenCalled();
+  });
+
+  it("rolls an edge that touches the next clip, and nothing else", () => {
+    const left = video("l", 0);
+    const right = video("r", 2);
+    const roll = press("roll", left, [left, right], "end");
+    expect(roll.setResizingClip).toHaveBeenCalledWith(
+      expect.objectContaining({ mode: "roll", rollPartnerKey: "r", edge: "end" }),
+    );
+    expect(press("roll", left, [left, right], "start").setResizingClip).not.toHaveBeenCalled();
+    const body = press("roll", left, [left, right], "body");
+    expect(body.setResizingClip).not.toHaveBeenCalled();
+    expect(body.setDraggedClip).not.toHaveBeenCalled();
+  });
+});

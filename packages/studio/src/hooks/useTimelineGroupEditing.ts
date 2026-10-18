@@ -398,7 +398,8 @@ export function useTimelineGroupEditing({
       // the just-patched live DOM. See syncPreviewContentDuration.
       syncPreviewContentDuration(previewIframeRef.current);
       const { coalesceKey, coalesceMs } = timingGestureStep("timeline-group-resize", options);
-      return enqueueGroupOperation("Resize timeline clips", async (projectId) => {
+      const label = options?.label ?? "Resize timeline clips";
+      return enqueueGroupOperation(label, async (projectId) => {
         await options?.beforeTiming;
         const sdk = await trySdkBatchPersist({
           changes,
@@ -408,14 +409,14 @@ export function useTimelineGroupEditing({
           })),
           eligible: changes.every((change) => !resizeHasPlaybackStartAdjustment(change)),
           needsExtension,
-          label: "Resize timeline clips",
+          label,
           coalesceKey,
           coalesceMs,
         });
         if (!sdk) {
           await persistServerBatch(
             projectId,
-            "Resize timeline clips",
+            label,
             changes.map((change) => ({
               element: change.element,
               buildPatches: (original, target) =>
@@ -436,7 +437,7 @@ export function useTimelineGroupEditing({
             projectId,
             iframe: previewIframeRef.current,
             reloadPreview,
-            label: "Resize timeline clips",
+            label,
             errorLabel: "Failed to scale GSAP positions",
             coalesceKey,
             recordEdit,

@@ -161,17 +161,13 @@ it.each([false, true])(
 
 const SLOWER_THAN_THE_DEFAULT_WINDOW_MS = 400;
 
-it("undoes each group move with its GSAP rewrite in one step, however long the rewrite takes", async () => {
-  vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
-  const dir = mkdtempSync(join(tmpdir(), "hf-group-move-undo-"));
-  const historyRoot = mkdtempSync(join(tmpdir(), "hf-group-move-undo-history-"));
-  const before = [
-    '<div data-composition-id="root" data-duration="4">',
-    '<div id="a" data-start="0" data-duration="2"></div>',
-    '<div id="b" data-start="0" data-duration="2"></div>',
-    "</div>",
-    '<script>const tl = gsap.timeline({ paused: true }); tl.to("#a", { x: 10, duration: 1 }, 0); tl.to("#b", { x: 10, duration: 1 }, 0); window.__timelines["root"] = tl;</script>',
-  ].join("");
+/** A project on disk served by the real Studio API, with its undo history, and the hooks on it. */
+async function mountRealProject(
+  before: string,
+  fetchHook: (url: string) => Promise<void> = async () => {},
+) {
+  const dir = mkdtempSync(join(tmpdir(), "hf-group-edit-"));
+  const historyRoot = mkdtempSync(join(tmpdir(), "hf-group-edit-history-"));
   writeFileSync(join(dir, "index.html"), before);
   const history = await openProjectHistory({ projectDir: dir, historyRoot });
   const api = createStudioApi({
@@ -179,12 +175,8 @@ it("undoes each group move with its GSAP rewrite in one step, however long the r
     resolveProject: (id: string) => (id === "demo" ? { id, dir } : null),
     history: () => history,
   } as unknown as StudioApiAdapter);
-  let rewriteAsked = () => {};
   vi.stubGlobal("fetch", async (url: string, init?: RequestInit) => {
-    if (url.includes("/gsap-mutations")) {
-      rewriteAsked();
-      await new Promise((wait) => setTimeout(wait, SLOWER_THAN_THE_DEFAULT_WINDOW_MS));
-    }
+    await fetchHook(url);
     return api.request(url.replace(/^\/api/, ""), init);
   });
   let editHistory!: ReturnType<typeof usePersistentEditHistory>;
@@ -205,11 +197,42 @@ it("undoes each group move with its GSAP rewrite in one step, however long the r
     return null;
   }
   const root = mountReactHarness(<Harness />);
-  const file = () => readFileSync(join(dir, "index.html"), "utf8");
+  return {
+    editing: () => editing,
+    file: () => readFileSync(join(dir, "index.html"), "utf8"),
+    undo: () =>
+      act(() =>
+        editHistory.undo({ readFile: async (path) => readFileSync(join(dir, path), "utf8") }),
+      ),
+    async close() {
+      act(() => root.unmount());
+      await history.close();
+      vi.unstubAllGlobals();
+      rmSync(dir, { recursive: true, force: true });
+      rmSync(historyRoot, { recursive: true, force: true });
+    },
+  };
+}
+
+it("undoes each group move with its GSAP rewrite in one step, however long the rewrite takes", async () => {
+  vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+  const before = [
+    '<div data-composition-id="root" data-duration="4">',
+    '<div id="a" data-start="0" data-duration="2"></div>',
+    '<div id="b" data-start="0" data-duration="2"></div>',
+    "</div>",
+    '<script>const tl = gsap.timeline({ paused: true }); tl.to("#a", { x: 10, duration: 1 }, 0); tl.to("#b", { x: 10, duration: 1 }, 0); window.__timelines["root"] = tl;</script>',
+  ].join("");
+  let rewriteAsked = () => {};
+  const project = await mountRealProject(before, async (url) => {
+    if (!url.includes("/gsap-mutations")) return;
+    rewriteAsked();
+    await new Promise((wait) => setTimeout(wait, SLOWER_THAN_THE_DEFAULT_WINDOW_MS));
+  });
   const moveTo = (from: number, to: number) =>
     act(async () => {
       const rewriting = new Promise<void>((resolve) => (rewriteAsked = resolve));
-      const moved = editing.handleTimelineGroupMove([
+      const moved = project.editing().handleTimelineGroupMove([
         { element: el("a", from, 2), start: to },
         { element: el("b", from, 2), start: to },
       ]);
@@ -217,26 +240,80 @@ it("undoes each group move with its GSAP rewrite in one step, however long the r
       await vi.advanceTimersByTimeAsync(SLOWER_THAN_THE_DEFAULT_WINDOW_MS);
       await moved;
     });
-  const undo = () =>
-    act(() =>
-      editHistory.undo({ readFile: async (path) => readFileSync(join(dir, path), "utf8") }),
-    );
   try {
     await moveTo(0, 1);
-    const once = file();
+    const once = project.file();
     await moveTo(1, 2);
-    expect(file()).toContain('tl.to("#a", { x: 10, duration: 1 }, 2)');
+    expect(project.file()).toContain('tl.to("#a", { x: 10, duration: 1 }, 2)');
 
-    await undo();
-    expect(file()).toBe(once);
-    await undo();
-    expect(file()).toBe(before);
+    await project.undo();
+    expect(project.file()).toBe(once);
+    await project.undo();
+    expect(project.file()).toBe(before);
   } finally {
-    act(() => root.unmount());
-    await history.close();
     vi.useRealTimers();
-    vi.unstubAllGlobals();
-    rmSync(dir, { recursive: true, force: true });
-    rmSync(historyRoot, { recursive: true, force: true });
+    await project.close();
   }
+});
+
+describe("slip and roll through the group resize", () => {
+  const before = [
+    '<div data-composition-id="root" data-duration="5">',
+    '<video id="a" src="a.mp4" data-start="0" data-duration="2" data-media-start="1" data-track-index="0"></video>',
+    '<video id="b" src="b.mp4" data-start="2" data-duration="3" data-media-start="4" data-track-index="0"></video>',
+    "</div>",
+  ].join("");
+  const video = (
+    id: string,
+    start: number,
+    duration: number,
+    playbackStart: number,
+  ): TimelineElement => ({
+    ...el(id, start, duration),
+    kind: "video",
+    playbackStart,
+    playbackStartAttr: "media-start",
+  });
+
+  it("saves a slip as a new in-point only, undone in one step", async () => {
+    const project = await mountRealProject(before);
+    try {
+      await act(() =>
+        project
+          .editing()
+          .handleTimelineGroupResize([
+            { element: video("a", 0, 2, 1), start: 0, duration: 2, playbackStart: 0.5 },
+          ]),
+      );
+      expect(project.file()).toBe(before.replace('data-media-start="1"', 'data-media-start="0.5"'));
+      await project.undo();
+      expect(project.file()).toBe(before);
+    } finally {
+      await project.close();
+    }
+  });
+
+  it("saves a roll from the file's own in-points, undone in one step", async () => {
+    const project = await mountRealProject(before);
+    try {
+      await act(() =>
+        project.editing().handleTimelineGroupResize([
+          // What a roll sends: no in-points, whatever the timeline last read for them.
+          { element: video("a", 0, 2, 0.5), start: 0, duration: 2.5 },
+          { element: video("b", 2, 3, 9), start: 2.5, duration: 2.5 },
+        ]),
+      );
+      const saved = project.file();
+      expect(saved).toContain(
+        'id="a" src="a.mp4" data-start="0" data-duration="2.5" data-media-start="1"',
+      );
+      expect(saved).toContain(
+        'id="b" src="b.mp4" data-start="2.5" data-duration="2.5" data-media-start="4.5"',
+      );
+      await project.undo();
+      expect(project.file()).toBe(before);
+    } finally {
+      await project.close();
+    }
+  });
 });

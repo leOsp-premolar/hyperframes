@@ -10,6 +10,7 @@ import type { TimelineEditCallbacks } from "./timelineCallbacks";
 import { CLIP_HANDLE_W } from "./timelineLayout";
 import { selectClipWithLinks, toggleClipWithLinks } from "./timelineLinkSelection";
 import { SPLIT_BOUNDARY_EPSILON_S } from "../../utils/timelineElementSplit";
+import { canSlip, findRollPartner } from "./timelineSlipRoll";
 
 export interface ClipGestureDeps {
   pps: number;
@@ -78,7 +79,8 @@ function resolvePointerDownAction(
   onMoveElement: ClipGestureDeps["onMoveElement"],
 ): PointerDownAction {
   if (e.button !== 0) return { kind: "ignore" };
-  if (usePlayerStore.getState().activeTool === "razor") return { kind: "ignore" };
+  // Razor clicks split; slip and roll own their own drags (see onPointerDown / onResizeStart).
+  if (usePlayerStore.getState().activeTool !== "select") return { kind: "ignore" };
   if (isAdditiveClick(e)) return { kind: "ignore" };
 
   const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
@@ -126,13 +128,18 @@ export function createClipGestureHandlers(
     onSelectElement,
   } = deps;
 
-  const onResizeStart = (edge: "start" | "end", e: ReactPointerEvent): void => {
-    if (!canStartResize(edge, e, capabilities, onResizeElement)) return;
+  /** A trim-shaped gesture on `edge`: a trim, or a slip or roll in those tools. */
+  const startResizeGesture = (
+    edge: "start" | "end",
+    e: ReactPointerEvent,
+    extra: Pick<ResizingClipState, "mode" | "rollPartnerKey"> = {},
+  ): void => {
     e.stopPropagation();
     blockedClipRef.current = null;
     setShowPopover(false);
     setRangeSelection(null);
     setResizingClip({
+      ...extra,
       pointerId: e.pointerId,
       element: el,
       edge,
@@ -146,7 +153,32 @@ export function createClipGestureHandlers(
     });
   };
 
+  const onResizeStart = (edge: "start" | "end", e: ReactPointerEvent): void => {
+    if (!canStartResize(edge, e, capabilities, onResizeElement)) return;
+    const { activeTool, elements } = usePlayerStore.getState();
+    if (activeTool === "slip" || activeTool === "razor") return;
+    if (activeTool === "roll") {
+      // A roll needs a clip touching this edge; an edge with none has no edit point to move.
+      const partner = findRollPartner(el, edge, elements);
+      if (partner)
+        startResizeGesture(edge, e, { mode: "roll", rollPartnerKey: partner.key ?? partner.id });
+      else e.stopPropagation();
+      return;
+    }
+    startResizeGesture(edge, e);
+  };
+
+  const onSlipStart = (e: ReactPointerEvent): void => {
+    const editable = capabilities.canTrimStart && capabilities.canTrimEnd && onResizeElement;
+    if (e.button !== 0 || isAdditiveClick(e) || !editable || !canSlip(el)) return;
+    startResizeGesture("start", e, { mode: "slip" });
+  };
+
   const onPointerDown = (e: ReactPointerEvent): void => {
+    if (usePlayerStore.getState().activeTool === "slip") {
+      onSlipStart(e);
+      return;
+    }
     const action = resolvePointerDownAction(e, capabilities, onResizeElement, onMoveElement);
     if (action.kind === "ignore") return;
 

@@ -14,6 +14,40 @@ function SelectIcon() {
   );
 }
 
+/** A clip window with arrows inside it: the source slides, the clip stays. */
+function SlipIcon() {
+  return (
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 16 16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.4"
+      aria-hidden="true"
+    >
+      <path d="M4 3v10M12 3v10M6 8h4M6 8l1.5-1.5M6 8l1.5 1.5M10 8L8.5 6.5M10 8L8.5 9.5" />
+    </svg>
+  );
+}
+
+/** Two clips meeting at an edit point that moves both ways. */
+function RollIcon() {
+  return (
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 16 16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.4"
+      aria-hidden="true"
+    >
+      <path d="M8 2v12M2 8h4M2 8l1.5-1.5M2 8l1.5 1.5M14 8h-4M14 8l-1.5-1.5M14 8l-1.5 1.5" />
+    </svg>
+  );
+}
+
 interface ToolRow {
   label: string;
   shortcut: string;
@@ -40,6 +74,20 @@ export function TimelineToolPicker({ showSelectAroundPlayhead = true }) {
       icon: <Scissors size={16} />,
       active: activeTool === "razor",
       run: () => store().setActiveTool("razor"),
+    },
+    {
+      label: "Slip",
+      shortcut: "Y",
+      icon: <SlipIcon />,
+      active: activeTool === "slip",
+      run: () => store().setActiveTool("slip"),
+    },
+    {
+      label: "Roll",
+      shortcut: "U",
+      icon: <RollIcon />,
+      active: activeTool === "roll",
+      run: () => store().setActiveTool("roll"),
     },
   ];
   if (showSelectAroundPlayhead) {
