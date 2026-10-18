@@ -10,6 +10,9 @@ import { useSetElementAttribute } from "./timelineElementFxAttribute";
 import { useSetElementsAttribute } from "./timelineElementsAttribute";
 import { useTimelineDeleteOps } from "./useTimelineDeleteOps";
 import { useTimelineEditGuard } from "./useTimelineEditGuard";
+import { useTrackLocking } from "./useTrackLocking";
+import { moveTargets, TRACK_LOCKED_REASON } from "../player/components/trackLockSolo";
+import { useTrackSoloPreview } from "./useTrackSoloPreview";
 import {
   linkEditTargets,
   useTimelineLinkEditing,
@@ -51,7 +54,6 @@ export function useTimelineEditing({
   projectIdRef.current = projectId;
   const editQueueRef = useRef(Promise.resolve());
   const track = useTrackPendingTimelineEdit();
-  const checkEditable = useTimelineEditGate(canEdit, showToast);
   const guard = useTimelineEditGuard(canEdit, showToast);
 
   const groupEditing = useTimelineGroupEditing({
@@ -89,7 +91,7 @@ export function useTimelineEditing({
     projectIdRef,
   });
 
-  const handleToggleTrackHidden = useTimelineTrackVisibilityEditing({
+  const visibilityInput = {
     projectIdRef,
     activeCompPath,
     timelineElements,
@@ -100,7 +102,13 @@ export function useTimelineEditing({
     pendingTimelineEditPathRef,
     isRecordingRef,
     forceReloadSdkSession,
-  });
+  };
+  const handleToggleTrackHidden = useTimelineTrackVisibilityEditing(visibilityInput);
+  // Hiding and muting stay open on a locked track; every other edit goes through the lock.
+  const canEditUnlocked = useTrackLocking(visibilityInput, canEdit);
+  const checkEditable = useTimelineEditGate(canEditUnlocked, showToast);
+  const editGuard = useTimelineEditGuard(canEditUnlocked, showToast);
+  useTrackSoloPreview(projectId, previewIframeRef, activeCompPath);
 
   const handleToggleElementHidden = useTimelineElementVisibilityEditing({
     projectIdRef,
@@ -217,6 +225,9 @@ export function useTimelineEditing({
   });
 
   const refused = (reason: string): TimelineEditOutcome => ({ status: "refused", reason });
+  // A drag onto a locked track must fail, so the timeline puts the clip back where it was.
+  const rejectRefusedMove = (reason: string) =>
+    reason === TRACK_LOCKED_REASON ? Promise.reject(new Error(reason)) : undefined;
   const audioGroupMembers = (groupId: string): TimelineElement[] => {
     const state = usePlayerStore.getState();
     const flatMembers = state.elements.filter((el) => el.audioGroup === groupId);
@@ -250,9 +261,9 @@ export function useTimelineEditing({
   const stableAudioGroupAttribute = useStableHandlers(audioGroupAttribute, projectId);
   const elementFxAttribute = {
     ...setElementFxAttribute,
-    setMany: track(guard((edits) => edits.map((edit) => edit.element), setElementsAttribute)),
+    setMany: track(editGuard((edits) => edits.map((edit) => edit.element), setElementsAttribute)),
     setQuiet: track(
-      guard(
+      editGuard(
         (element) => [element],
         setElementFxAttribute.setQuiet,
         (reason, element, attr) => {
@@ -267,11 +278,19 @@ export function useTimelineEditing({
   // converge, so undo never races a write; canEdit gates the same point.
   // Coverage boundary: see the PR body, not every kind resolves an element.
   const trackedRazorSplit = track(
-    guard((element) => withLinkPartners([element]), handleRazorSplit),
+    editGuard((element) => withLinkPartners([element]), handleRazorSplit),
   );
   const editing = {
-    handleTimelineElementMove: track(guard((element) => [element], handleTimelineElementMove)),
-    handleTimelineElementResize: track(guard((element) => [element], handleTimelineElementResize)),
+    handleTimelineElementMove: track(
+      editGuard(
+        (element) => moveTargets([element], usePlayerStore.getState().elements),
+        handleTimelineElementMove,
+        rejectRefusedMove,
+      ),
+    ),
+    handleTimelineElementResize: track(
+      editGuard((element) => [element], handleTimelineElementResize),
+    ),
     handleToggleTrackHidden: track(
       guard(
         (trackIndex) => timelineElements.filter((el) => el.track === trackIndex),
@@ -288,21 +307,21 @@ export function useTimelineEditing({
     setAudioGroupAttribute: stableAudioGroupAttribute,
     setElementFxAttribute: stableElementFxAttribute,
     handleTimelineElementDelete: track(
-      guard((element) => withLinkPartners([element]), linkEditing.handleLinkedElementDelete),
+      editGuard((element) => withLinkPartners([element]), linkEditing.handleLinkedElementDelete),
     ),
     handleTimelineElementsDelete: track(
-      guard(withLinkPartners, linkEditing.handleLinkedElementsDelete),
+      editGuard(withLinkPartners, linkEditing.handleLinkedElementsDelete),
     ),
     handleTimelineElementDeleteOnly: track(
-      guard((element) => [element], linkEditing.handleDeleteElementOnly),
+      editGuard((element) => [element], linkEditing.handleDeleteElementOnly),
     ),
-    handleLinkEdit: track(guard(linkEditTargets, linkEditing.handleLinkEdit)),
+    handleLinkEdit: track(editGuard(linkEditTargets, linkEditing.handleLinkEdit)),
     handleTimelineElementSplit: trackedRazorSplit,
     handleRazorSplit: trackedRazorSplit,
-    handleFreezeFrame: track(guard((element) => [element], handleFreezeFrame)),
+    handleFreezeFrame: track(editGuard((element) => [element], handleFreezeFrame)),
     // Same selection the handler itself splits (useRazorSplit.ts).
     handleRazorSplitAll: track(
-      guard(
+      editGuard(
         (splitTime) => selectSplittableElements(usePlayerStore.getState().elements, splitTime),
         handleRazorSplitAll,
       ),
@@ -312,10 +331,18 @@ export function useTimelineEditing({
     handleTimelineCompositionDrop: track(handleTimelineCompositionDrop),
     handleBlockedTimelineEdit,
     handleTimelineGroupMove: track(
-      guard((changes) => changes.map((c) => c.element), groupEditing.handleTimelineGroupMove),
+      editGuard(
+        (changes) =>
+          moveTargets(
+            changes.map((c) => c.element),
+            usePlayerStore.getState().elements,
+          ),
+        groupEditing.handleTimelineGroupMove,
+        rejectRefusedMove,
+      ),
     ),
     handleTimelineGroupResize: track(
-      guard((changes) => changes.map((c) => c.element), groupEditing.handleTimelineGroupResize),
+      editGuard((changes) => changes.map((c) => c.element), groupEditing.handleTimelineGroupResize),
     ),
     restoreLiveLanes: (restore: Parameters<typeof setElementFxAttribute.restoreLive>[0]) => {
       setElementFxAttribute.restoreLive(restore);

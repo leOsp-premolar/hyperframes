@@ -6,16 +6,16 @@ previous one's tests.
 
 ## Stages
 
-| Stage | Branch                     | State   | Scope                                                                    |
-| ----- | -------------------------- | ------- | ------------------------------------------------------------------------ |
-| S0    | `studio/s0-e2e-workflow`   | Done    | Browser gate: import, place, split, trim, undo/redo, reload, export      |
-| S4    | `studio/s4-create-project` | Done    | New project from the header or the empty start screen; `POST /projects`  |
-| S2    | `studio/s2-media-metadata` | Done    | Media metadata on asset cards; upload validation                         |
-| S3    | `studio/s3-missing-media`  | Review  | Missing media detection and replacement                                  |
-| S1    | `studio/s1-export-options` | Review  | Export the in/out range; audio-only export; GIF and PNG sequence options |
-| S5    | `studio/s5-slip-roll`      | Review  | Slip and roll editing                                                    |
-| S6    |                            | Planned | Track lock and solo                                                      |
-| S7    |                            | Planned | Browser verification of keyframes and playback                           |
+| Stage | Branch                      | State   | Scope                                                                    |
+| ----- | --------------------------- | ------- | ------------------------------------------------------------------------ |
+| S0    | `studio/s0-e2e-workflow`    | Done    | Browser gate: import, place, split, trim, undo/redo, reload, export      |
+| S4    | `studio/s4-create-project`  | Done    | New project from the header or the empty start screen; `POST /projects`  |
+| S2    | `studio/s2-media-metadata`  | Done    | Media metadata on asset cards; upload validation                         |
+| S3    | `studio/s3-missing-media`   | Review  | Missing media detection and replacement                                  |
+| S1    | `studio/s1-export-options`  | Review  | Export the in/out range; audio-only export; GIF and PNG sequence options |
+| S5    | `studio/s5-slip-roll`       | Review  | Slip and roll editing                                                    |
+| S6    | `studio/s6-track-lock-solo` | Review  | Track lock and solo                                                      |
+| S7    |                             | Planned | Browser verification of keyframes and playback                           |
 
 ## Known limitations to plan for
 
@@ -158,3 +158,32 @@ Limits:
   how long a source is, a slip can slide past its end, leaving the tail of the clip without
   picture or sound.
 - **Images, text and shapes do not slip;** they have no source to slide.
+
+Recorded with S6, for review.
+
+How lock and solo work: each track header has a padlock and, on tracks with sound, an S button.
+The padlock saves `data-timeline-locked` on every clip of the track as one undo entry ("Lock
+track N"); a track shows as locked when all its clips carry it. A locked track refuses every
+timeline edit of its clips with one message ("This track is locked. Unlock it to edit its
+clips."): move, trim, slip, roll, split, delete, freeze frame, link, effects and drops onto the
+track, and a clip dragged onto it from another track goes back to its own. Hiding and muting
+the track stay allowed. Solo is for listening: while any track is soloed, every clip with sound
+on other tracks is silent in the preview through a mark (`data-hf-solo-silenced`) that only the
+preview runtime reads; it never reaches the file or the export, and it ends when the project
+changes.
+
+The timeline now counts the lock as a change when it re-reads the file, so undoing a lock
+updates the padlock; before, a change to the lock alone was ignored.
+
+Limits:
+
+- **Solo is not saved,** on purpose: it ends with the session or the project, and the export
+  always has every track. A saved solo would need its own attribute and an export rule.
+- **Solo silences sound, not picture.** Tracks without sound show no S button.
+- **The preview applies solo while playing.** A paused preview has nothing to hear, so the
+  silence is set on the next played frame, not the moment the button is pressed.
+- **The lock lives on the clips, not on the track.** A clip that reaches a locked track other
+  than by a timeline move or drop (the code view, an agent, a paste) arrives unlocked, and the
+  track then shows as unlocked until it is locked again.
+- **Only the timeline is covered.** Edits from the canvas, the inspector and the code view were
+  not tested against the lock.

@@ -637,3 +637,52 @@ describe("createAudioGroupAndAssignMembers", () => {
     ).toBe(false);
   });
 });
+
+describe("toggleTimelineTrackHidden with the lock flag", () => {
+  it("saves data-timeline-locked on every clip of the track as one undo entry", async () => {
+    const files = new Map([
+      [
+        "index.html",
+        `<div id="hero" data-start="0" data-duration="2"></div>
+<div id="caption" data-start="2" data-duration="2"></div>
+<div id="other" data-start="0" data-duration="2"></div>`,
+      ],
+    ]);
+    stubProjectFiles(files);
+    const writes = new Map<string, string>();
+    const recordEdit = vi.fn();
+    usePlayerStore
+      .getState()
+      .setElements([
+        element({ id: "hero", domId: "hero", track: 0 }),
+        element({ id: "caption", domId: "caption", track: 0 }),
+      ]);
+
+    await toggleTimelineTrackHidden({
+      flag: "timelineLocked",
+      projectId: "project-1",
+      activeCompPath: "index.html",
+      timelineElements: [
+        element({ id: "hero", domId: "hero", track: 0 }),
+        element({ id: "caption", domId: "caption", track: 0 }),
+        element({ id: "other", domId: "other", track: 1 }),
+      ],
+      track: 0,
+      hidden: true,
+      previewIframe: null,
+      writeProjectFile: async (path, content) => {
+        writes.set(path, content);
+      },
+      recordEdit,
+      pendingTimelineEditPathRef: { current: new Set() },
+    });
+
+    const saved = writes.get("index.html") ?? "";
+    expect(saved.match(/data-timeline-locked=""/g)).toHaveLength(2);
+    expect(saved).toContain('<div id="other" data-start="0" data-duration="2"></div>');
+    expect(saved).not.toContain("data-hidden");
+    expect(recordEdit).toHaveBeenCalledTimes(1);
+    expect(recordEdit.mock.calls[0]?.[0]?.label).toBe("Lock track 1");
+    expect(usePlayerStore.getState().elements.every((el) => el.timelineLocked)).toBe(true);
+  });
+});

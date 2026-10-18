@@ -14,8 +14,10 @@ import {
   skipsHiddenImages,
 } from "./timedClipHide";
 import {
+  isSoloSilenced,
   PREVIEW_ONLY_ATTRS,
   RUNTIME_STAMPED_ATTR,
+  STUDIO_SOLO_SILENCED_ATTR,
   STUDIO_PREVIEW_LAZY_ATTR,
   STUDIO_PREVIEW_UPCOMING_ATTR,
 } from "../studioPreviewMark";
@@ -544,7 +546,9 @@ export function initSandboxRuntimeModular(): void {
    *  never an ancestor — membership is on the member's `data-audio-group` — so
    *  `closest()` alone could not see a muted group, which the render drops. */
   const isSilencedByHidden = (el: Element): boolean =>
-    el.closest("[data-hidden]") !== null || isMemberGroupHidden(el.ownerDocument, el);
+    el.closest("[data-hidden]") !== null ||
+    isSoloSilenced(el) ||
+    isMemberGroupHidden(el.ownerDocument, el);
   // `_auto` is a Studio-internal keyframe marker (an auto-tracked endpoint the
   // parser reads back), NOT an animatable property. Register it as a no-op GSAP
   // plugin so GSAP doesn't log "Invalid property _auto" on every tween build —
@@ -2706,6 +2710,9 @@ export function initSandboxRuntimeModular(): void {
     else el.style.removeProperty("display");
   };
   const dataHiddenDisplayNodes = new WeakSet<StylableElement>();
+  // Studio's solo silences clips in the preview only: no display change, just the same audio
+  // reschedule a data-hidden toggle gets.
+  const soloSilencedNodes = new WeakSet<StylableElement>();
   // A data-hidden toggle on (or affecting) an audio element must re-schedule
   // WebAudio playback so the hidden clip's source is dropped/restored mid-
   // playback. Batched to one call per syncTimedElementVisibility pass, not
@@ -2936,6 +2943,12 @@ export function initSandboxRuntimeModular(): void {
         : unchangedSincePlayedFrom(playedFromSeconds, currentTime, rootComp);
     for (const rawNode of visibilityNodes) {
       if (!isStylableElement(rawNode)) continue;
+
+      if (rawNode.hasAttribute(STUDIO_SOLO_SILENCED_ATTR) !== soloSilencedNodes.has(rawNode)) {
+        if (soloSilencedNodes.has(rawNode)) soloSilencedNodes.delete(rawNode);
+        else soloSilencedNodes.add(rawNode);
+        if (nodeAffectsAudio(rawNode)) hiddenAudioDirty = true;
+      }
 
       if (rawNode.hasAttribute("data-hidden")) {
         if (!dataHiddenDisplayNodes.has(rawNode)) {

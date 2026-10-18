@@ -17,7 +17,13 @@ import {
   runStudioGate,
   studioGateSetup,
 } from "./editorWorkflowSteps.mjs";
-import { hoverClipEndEdge } from "./timelineGestures.mjs";
+import {
+  clipBox,
+  clipSelector,
+  dragClipBody,
+  dragFrom,
+  hoverClipEndEdge,
+} from "./timelineGestures.mjs";
 
 const PROJECT_ID = "slip-roll";
 const STUDIO_URL = process.env.STUDIO_URL;
@@ -100,17 +106,6 @@ await runStudioGate({ studioUrl: STUDIO_URL, outDir: process.env.OUT_DIR }, asyn
   }
 });
 
-function clipSelector(id) {
-  return `.timeline-clip[data-el-id$="#${id}"]`;
-}
-
-async function clipBox(page, id) {
-  return page.$eval(clipSelector(id), (el) => {
-    const r = el.getBoundingClientRect();
-    return { x: r.x, y: r.y, width: r.width, height: r.height };
-  });
-}
-
 async function pixelsPerSecond(page) {
   const box = await clipBox(page, "a");
   return box.width / 2;
@@ -118,19 +113,6 @@ async function pixelsPerSecond(page) {
 
 function toolLabel(page) {
   return page.$eval('[aria-label^="Timeline tool:"]', (el) => el.getAttribute("aria-label"));
-}
-
-async function dragFrom(page, x, y, dx) {
-  await page.mouse.move(x, y);
-  await page.mouse.down();
-  for (const part of [0.25, 0.5, 0.75, 1]) await page.mouse.move(x + dx * part, y);
-  await page.mouse.up();
-}
-
-/** Press the middle of a clip, away from its trim handles, and drag. */
-async function dragClipBody(page, id, dx) {
-  const box = await clipBox(page, id);
-  await dragFrom(page, box.x + box.width / 2, box.y + box.height / 2, dx);
 }
 
 async function dragEdge(page, id, dx) {

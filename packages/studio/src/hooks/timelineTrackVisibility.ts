@@ -19,6 +19,16 @@ import {
   type RecordEditInput,
 } from "./timelineEditingHelpers";
 
+/** The boolean clip attributes a track header toggles across every clip on the track. */
+type TrackFlag = "hidden" | "timelineLocked";
+
+const TRACK_FLAGS: Record<TrackFlag, { attr: string; property: string; reseek: boolean }> = {
+  // Hiding changes what the preview shows and plays, so the runtime re-seeks.
+  hidden: { attr: "data-hidden", property: "hidden", reseek: true },
+  // A lock changes only what Studio lets you edit.
+  timelineLocked: { attr: "data-timeline-locked", property: "timeline-locked", reseek: false },
+};
+
 export interface MutableRef<T> {
   current: T;
 }
@@ -28,6 +38,8 @@ interface ReadonlyRef<T> {
 }
 
 interface ToggleTimelineTrackHiddenInput {
+  /** Which attribute the toggle writes; hiding unless a lock asks otherwise. */
+  flag?: TrackFlag;
   projectId: string;
   activeCompPath: string | null;
   timelineElements: readonly TimelineElement[];
@@ -48,6 +60,7 @@ interface ToggleTimelineElementHiddenInput extends Omit<ToggleTimelineTrackHidde
 }
 
 interface SetElementsHiddenInput {
+  flag?: TrackFlag;
   projectId: string;
   activeCompPath: string | null;
   elements: readonly TimelineElement[];
@@ -88,19 +101,20 @@ function getTimelineElementTargetPath(
   return element.sourceFile || activeCompPath || "index.html";
 }
 
-function patchLiveHiddenState(
+function patchLiveFlag(
   iframe: HTMLIFrameElement | null,
   elements: readonly TimelineElement[],
-  hidden: boolean,
+  attr: string,
+  on: boolean,
   activeCompPath: string | null,
 ): void {
   for (const element of elements) {
     const target = findTimelineElementInIframe(iframe, element, activeCompPath);
     if (!target) continue;
-    if (hidden) {
-      target.setAttribute("data-hidden", "");
+    if (on) {
+      target.setAttribute(attr, "");
     } else {
-      target.removeAttribute("data-hidden");
+      target.removeAttribute(attr);
     }
   }
 }
@@ -130,6 +144,7 @@ export function groupElementsByTargetPath(
 
 // fallow-ignore-next-line complexity
 async function setElementsHidden({
+  flag = "hidden",
   projectId,
   activeCompPath,
   elements,
@@ -141,13 +156,16 @@ async function setElementsHidden({
   pendingTimelineEditPathRef,
 }: SetElementsHiddenInput): Promise<string[]> {
   if (elements.length === 0) return [];
-
-  patchLiveHiddenState(previewIframe, elements, hidden, activeCompPath);
-  reseekPreviewRuntime(previewIframe);
+  const config = TRACK_FLAGS[flag];
+  const applyLive = (on: boolean) => {
+    patchLiveFlag(previewIframe, elements, config.attr, on, activeCompPath);
+    if (config.reseek) reseekPreviewRuntime(previewIframe);
+  };
+  applyLive(hidden);
 
   const hiddenOperation: PatchOperation = {
     type: "attribute",
-    property: "hidden",
+    property: config.property,
     value: hidden ? "" : null,
   };
   const files: Record<string, (current: string) => string> = {};
@@ -172,20 +190,20 @@ async function setElementsHidden({
       recordEdit,
     });
     for (const element of elements) {
-      usePlayerStore.getState().updateElement(element.key ?? element.id, { hidden });
+      usePlayerStore.getState().updateElement(element.key ?? element.id, { [flag]: hidden });
     }
     return changedPaths;
   } catch (error) {
     // The optimistic live patch already ran; a patch-target/save failure here would
     // otherwise leave the preview showing the wrong visibility until a reload. Revert
     // the live DOM to the prior state so what's on screen matches what persisted.
-    patchLiveHiddenState(previewIframe, elements, !hidden, activeCompPath);
-    reseekPreviewRuntime(previewIframe);
+    applyLive(!hidden);
     throw error;
   }
 }
 
 export async function toggleTimelineTrackHidden({
+  flag = "hidden",
   projectId,
   activeCompPath,
   timelineElements,
@@ -208,13 +226,19 @@ export async function toggleTimelineTrackHidden({
   );
   const trackElements = timelineElements.filter((element) => element.track === track);
   const hiddenBefore = !hidden;
-  const label = `${hiddenToggleVerb(isAudioOnlyTrack(trackElements), hiddenBefore)} track${suffix}`;
+  const verb =
+    flag === "timelineLocked"
+      ? hidden
+        ? "Lock"
+        : "Unlock"
+      : hiddenToggleVerb(isAudioOnlyTrack(trackElements), hiddenBefore);
   return setElementsHidden({
+    flag,
+    label: `${verb} track${suffix}`,
     projectId,
     activeCompPath,
     elements: trackElements,
     hidden,
-    label,
     previewIframe,
     writeProjectFile,
     recordEdit,
@@ -251,6 +275,7 @@ export async function toggleTimelineElementHidden({
 }
 
 export function useTimelineTrackVisibilityEditing({
+  flag = "hidden",
   projectIdRef,
   activeCompPath,
   showToast,
@@ -280,6 +305,7 @@ export function useTimelineTrackVisibilityEditing({
       if (!pid) return;
       try {
         await toggleTimelineTrackHidden({
+          flag,
           projectId: pid,
           activeCompPath,
           timelineElements,
@@ -293,13 +319,14 @@ export function useTimelineTrackVisibilityEditing({
         });
         forceReloadSdkSession?.();
       } catch (error) {
-        console.error("[Timeline] Failed to toggle track visibility", error);
-        const message =
-          error instanceof Error ? error.message : "Failed to toggle track visibility";
+        const what = flag === "timelineLocked" ? "lock" : "visibility";
+        console.error(`[Timeline] Failed to toggle track ${what}`, error);
+        const message = error instanceof Error ? error.message : `Failed to toggle track ${what}`;
         showToast(message);
       }
     },
     [
+      flag,
       activeCompPath,
       timelineElements,
       previewIframeRef,

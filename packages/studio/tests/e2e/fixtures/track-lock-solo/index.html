@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=640, height=360" />
+    <style>
+      html,
+      body {
+        margin: 0;
+        width: 640px;
+        height: 360px;
+        overflow: hidden;
+        background: #000;
+      }
+      #title {
+        position: absolute;
+        inset: 0;
+        display: grid;
+        place-items: center;
+        color: #fff;
+        font: 600 48px sans-serif;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- Music on track 0, a silent voice on track 1, a title on track 2; the track-lock-solo
+         gate writes both sounds into assets/. -->
+    <div
+      id="root"
+      data-composition-id="main"
+      data-start="0"
+      data-duration="4"
+      data-width="640"
+      data-height="360"
+      data-no-timeline
+    >
+      <audio
+        id="music"
+        class="clip"
+        src="assets/music.wav"
+        data-start="0"
+        data-duration="3"
+        data-track-index="0"
+      ></audio>
+      <audio
+        id="voice"
+        class="clip"
+        src="assets/voice.wav"
+        data-start="0"
+        data-duration="4"
+        data-track-index="1"
+      ></audio>
+      <div id="title" class="clip" data-start="0" data-duration="4" data-track-index="2">
+        Lock and solo
+      </div>
+    </div>
+  </body>
+</html>
