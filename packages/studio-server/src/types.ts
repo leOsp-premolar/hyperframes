@@ -106,6 +106,16 @@ export interface StudioApiAdapter {
   /** List all available projects. */
   listProjects(): Promise<ResolvedProject[]> | ResolvedProject[];
 
+  /**
+   * Create the project `id` holding `files` (paths inside the project folder). Absent when the
+   * host serves a single project. Must never reuse or replace an existing folder: it throws an
+   * error whose `code` is "EEXIST" instead, and leaves nothing behind when a write fails.
+   */
+  createProject?(
+    id: string,
+    files: Record<string, string>,
+  ): Promise<ResolvedProject> | ResolvedProject;
+
   /** Resolve a project ID (or session ID) to its directory. Returns null if not found. */
   resolveProject(id: string): Promise<ResolvedProject | null> | ResolvedProject | null;
 

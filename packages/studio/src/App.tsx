@@ -74,7 +74,8 @@ export interface StudioAppProps {
 
 // fallow-ignore-next-line complexity
 export function StudioApp({ readOnlyPreview = false, readOnlyPreviewReason }: StudioAppProps = {}) {
-  const { projectId, resolving, waitingForServer } = useServerConnection();
+  const connection = useServerConnection();
+  const { projectId, resolving, waitingForServer } = connection;
   const initialUrlStateRef = useRef(readStudioUrlStateFromWindow());
   useStudioSessionStart(projectId, resolving, waitingForServer);
   const [compIdToSrc, setCompIdToSrc] = useState<Map<string, string>>(new Map());
@@ -496,7 +497,7 @@ export function StudioApp({ readOnlyPreview = false, readOnlyPreviewReason }: St
     projectId,
   );
   if (resolving || waitingForServer || !projectId)
-    return <StudioSplash waiting={waitingForServer} />;
+    return <StudioSplash waiting={waitingForServer} server={connection} />;
   return (
     <StudioShellProvider value={studioCtxValue}>
       <StudioPlaybackProvider value={studioCtxValue}>
@@ -517,6 +518,7 @@ export function StudioApp({ readOnlyPreview = false, readOnlyPreviewReason }: St
                   inspectorButtonActive={inspectorButtonActive}
                   inspectorPanelActive={inspectorPanelActive}
                   onExport={handleExport}
+                  canCreateProjects={connection.canCreateProjects}
                 />
                 {previewPersistence.domEditSaveQueuePaused && !externalFileChanges.blocked && (
                   <SaveQueuePausedBanner

@@ -5,11 +5,13 @@ import {
   readFileSync,
   readdirSync,
   existsSync,
+  mkdirSync,
   writeFileSync,
   realpathSync,
+  rmSync,
   unlinkSync,
 } from "node:fs";
-import { basename, join, relative, resolve, isAbsolute, sep } from "node:path";
+import { basename, dirname, join, relative, resolve, isAbsolute, sep } from "node:path";
 import type { ViteDevServer } from "vite";
 import {
   type ResolvedProject,
@@ -104,6 +106,38 @@ export function createProjectSignatureCache({
 
 const isServableProjectId = (id: string) =>
   isValidProjectId(id) && !(process.platform === "win32" && id.includes(":"));
+
+/**
+ * Create `dataDir/id` and write `files` into it. The folder is made exclusively, so an existing
+ * project is never reused or overwritten (the error's code is EEXIST), and a failed write removes
+ * only the folder this call made.
+ */
+export function createProjectFolder(
+  dataDir: string,
+  id: string,
+  files: Record<string, string>,
+): ResolvedProject {
+  const projectDir = resolve(dataDir, id);
+  if (!isServableProjectId(id) || dirname(projectDir) !== resolve(dataDir)) {
+    throw new Error(`Not a project folder name: ${JSON.stringify(id)}`);
+  }
+  mkdirSync(dataDir, { recursive: true });
+  mkdirSync(projectDir);
+  try {
+    for (const [file, content] of Object.entries(files)) {
+      const target = resolve(projectDir, file);
+      if (target === projectDir || !isPathWithin(projectDir, target)) {
+        throw new Error(`Project file escapes its folder: ${JSON.stringify(file)}`);
+      }
+      mkdirSync(dirname(target), { recursive: true });
+      writeFileSync(target, content, { flag: "wx" });
+    }
+  } catch (err) {
+    rmSync(projectDir, { recursive: true, force: true });
+    throw err;
+  }
+  return { id, dir: realpathSync(projectDir) };
+}
 
 export function createViteAdapter(
   dataDir: string,
@@ -226,6 +260,10 @@ export function createViteAdapter(
           } satisfies ResolvedProject;
         })
         .sort((a, b) => (a.title ?? "").localeCompare(b.title ?? ""));
+    },
+
+    createProject(id: string, files: Record<string, string>) {
+      return createProjectFolder(dataDir, id, files);
     },
 
     // Studio's undo runs on the project's history: opened once per project; a failed open stays off unless the folder

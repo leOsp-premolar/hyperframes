@@ -58,6 +58,8 @@ beforeEach(() => {
 
 afterEach(() => {
   delete document.documentElement.dataset.theme;
+  vi.unstubAllGlobals();
+  window.location.hash = "";
   if (!mounted) return;
   const { root, host } = mounted;
   mounted = null;
@@ -66,7 +68,11 @@ afterEach(() => {
 });
 
 function mount(
-  props: { inspectorButtonActive?: boolean; themeToggle?: boolean } = {},
+  props: {
+    inspectorButtonActive?: boolean;
+    themeToggle?: boolean;
+    canCreateProjects?: boolean;
+  } = {},
 ): HTMLElement {
   const host = document.createElement("div");
   document.body.append(host);
@@ -79,6 +85,7 @@ function mount(
       handleCaptureFrameClick={vi.fn()}
       refreshCaptureFrameTime={vi.fn()}
       inspectorButtonActive={props.inspectorButtonActive ?? false}
+      canCreateProjects={props.canCreateProjects}
       inspectorPanelActive={false}
     />
   );
@@ -202,4 +209,41 @@ it("shows no theme toggle and leaves the host's data-theme alone when embedded",
 
 it("shows the theme toggle in Studio's own app", () => {
   expect(mount({ themeToggle: true }).querySelector('[aria-label^="Switch to"]')).not.toBeNull();
+});
+
+it("hides New project on a host that serves one project", () => {
+  expect(mount().querySelector('[aria-label="New project"]')).toBeNull();
+});
+
+it("opens New project with the name field focused, and closes it on Escape", () => {
+  const newProject = query(mount({ canCreateProjects: true }), '[aria-label="New project"]');
+  act(() => newProject.click());
+  expect(document.querySelector('[role="dialog"]')?.getAttribute("aria-labelledby")).toBe(
+    "new-project-title",
+  );
+  expect(document.activeElement?.id).toBe("new-project-name");
+  act(() => {
+    document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+  });
+  expect(document.querySelector('[role="dialog"]')).toBeNull();
+});
+
+it("follows the new project's hash once it is created", async () => {
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async () => new Response(JSON.stringify({ project: { id: "trip" } }), { status: 201 })),
+  );
+  const newProject = query(mount({ canCreateProjects: true }), '[aria-label="New project"]');
+  act(() => newProject.click());
+  const name = query(document.body, "#new-project-name");
+  act(() => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set?.call(name, "Trip");
+    name.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+  await act(async () => {
+    query(document.body, '[role="dialog"] button[type="submit"]').click();
+    await new Promise((r) => setTimeout(r, 0));
+  });
+  expect(window.location.hash).toBe("#project/trip");
+  expect(document.querySelector('[role="dialog"]')).toBeNull();
 });

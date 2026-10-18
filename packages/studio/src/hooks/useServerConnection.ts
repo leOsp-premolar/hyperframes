@@ -8,6 +8,10 @@ interface ServerConnectionState {
   projectId: string | null;
   resolving: boolean;
   waitingForServer: boolean;
+  /** The server answered and has no project yet: the wait is for a project, not the server. */
+  serverHasNoProjects: boolean;
+  /** The server can create projects (`POST /api/projects`). */
+  canCreateProjects: boolean;
 }
 
 /**
@@ -93,6 +97,8 @@ export function useServerConnection(): ServerConnectionState {
   const [projectId, setProjectId] = useState<string | null>(null);
   const [resolving, setResolving] = useState(true);
   const [waitingForServer, setWaitingForServer] = useState(false);
+  const [serverHasNoProjects, setServerHasNoProjects] = useState(false);
+  const [canCreateProjects, setCanCreateProjects] = useState(false);
 
   useMountEffect(() => {
     const hashProjectId = parseProjectIdFromHash(window.location.hash);
@@ -112,6 +118,7 @@ export function useServerConnection(): ServerConnectionState {
         .then((r) => r.json())
         .then(async (data) => {
           if (cancelled) return;
+          setCanCreateProjects(data.canCreateProjects === true);
           // A hash project id outlives the project it names — a renamed folder,
           // or a bookmark from a project that is gone. Trusting it blindly made
           // every later /api/projects/<id>/... request 404 for the life of the
@@ -132,6 +139,7 @@ export function useServerConnection(): ServerConnectionState {
             }
           }
           const first = (data.projects ?? [])[0];
+          setServerHasNoProjects(!first);
           if (first) {
             setProjectId(first.id);
             setWaitingForServer(false);
@@ -187,5 +195,5 @@ export function useServerConnection(): ServerConnectionState {
     return () => window.removeEventListener("hashchange", onHashChange);
   }, [projectId]);
 
-  return { projectId, resolving, waitingForServer };
+  return { projectId, resolving, waitingForServer, serverHasNoProjects, canCreateProjects };
 }
