@@ -14,12 +14,24 @@ import {
 import { projectDirMissing } from "../helpers/projectDirMissing.js";
 import { isVariablesPayload, VARIABLES_PAYLOAD_ERROR } from "../helpers/variablesPayload.js";
 import { parseEncoderOptions, type EncoderOptionsBody } from "../helpers/encoderOptions.js";
+import {
+  isAudioExportFormat,
+  isExportFormat,
+  parseExportRange,
+  planExport,
+} from "../helpers/exportPlan.js";
+import { startExportJob } from "../helpers/exportJob.js";
 
 const VALID_RESOLUTIONS = new Set<string>(VALID_CANVAS_RESOLUTIONS);
 const RENDER_MIME: Record<string, string> = {
   ".mp4": "video/mp4",
   ".webm": "video/webm",
   ".mov": "video/quicktime",
+  ".gif": "image/gif",
+  ".zip": "application/zip",
+  ".wav": "audio/wav",
+  ".mp3": "audio/mpeg",
+  ".m4a": "audio/mp4",
 };
 const RENDER_EXTENSIONS = Object.keys(RENDER_MIME);
 const RENDER_ARTIFACT_EXTENSIONS = [...RENDER_EXTENSIONS, ".meta.json"];
@@ -108,20 +120,31 @@ export function registerRenderRoutes(api: Hono, adapter: StudioApiAdapter): void
       // window.__hfVariables — same channel as `hyperframes render --variables`.
       variables?: Record<string, unknown>;
       gpu?: boolean;
+      // Seconds on the timeline, end exclusive: Studio's in/out points.
+      range?: unknown;
     };
-    const VALID_FORMATS = new Set(["mp4", "webm", "mov"]);
-    const FORMAT_EXT: Record<string, string> = { mp4: ".mp4", webm: ".webm", mov: ".mov" };
-    const format = VALID_FORMATS.has(body.format ?? "") ? (body.format as string) : "mp4";
+    const format = isExportFormat(body.format) ? body.format : "mp4";
+    const range = parseExportRange(body.range);
+    if (range && "error" in range) return c.json({ error: range.error }, 400);
+    const plan = planExport(format, range);
 
     // Default to 30 fps when unset or unparseable. The route stays lenient on
     // invalid fps values (matching the lenient handling of `resolution` and
     // `quality` already in this file) — the producer surfaces a clearer error
     // message if the caller really did mean to fail loudly.
     const fpsParse = body.fps === undefined ? null : parseFps(body.fps);
-    const fps = fpsParse && fpsParse.ok ? fpsParse.value : { num: 30, den: 1 };
-    const quality = ["draft", "standard", "high"].includes(body.quality ?? "")
-      ? (body.quality as string)
-      : "standard";
+    const requestedFps = fpsParse && fpsParse.ok ? fpsParse.value : { num: 30, den: 1 };
+    // GIF frame delays are whole centiseconds, so the producer caps GIF at 30 fps.
+    const fps =
+      format === "gif" && requestedFps.num / requestedFps.den > 30
+        ? { num: 30, den: 1 }
+        : requestedFps;
+    // Audio exports keep only the sound, so the picture is rendered as fast as it can be.
+    const quality = isAudioExportFormat(format)
+      ? "draft"
+      : ["draft", "standard", "high"].includes(body.quality ?? "")
+        ? (body.quality as string)
+        : "standard";
     const outputResolution = VALID_RESOLUTIONS.has(body.resolution ?? "")
       ? (body.resolution as CanvasResolution)
       : undefined;
@@ -147,20 +170,19 @@ export function registerRenderRoutes(api: Hono, adapter: StudioApiAdapter): void
       variables = body.variables;
     }
 
-    const encoder = parseEncoderOptions(body, format);
+    const encoder = parseEncoderOptions(body, plan.producerFormat);
     if (!encoder.ok) return c.json({ error: encoder.error }, 400);
 
     const now = new Date();
     const jobId = `${project.id}_${formatRenderOutputTimestamp(now)}`;
     const rendersDir = adapter.rendersDir(project);
     mkdirWithinProject(project.dir, rendersDir);
-    const ext = FORMAT_EXT[format] ?? ".mp4";
-    const outputPath = join(rendersDir, `${jobId}${ext}`);
+    const outputPath = join(rendersDir, `${jobId}${plan.ext}`);
 
-    const jobState = adapter.startRender({
+    const options = {
       project,
       outputPath,
-      format: format as "mp4" | "webm" | "mov",
+      format: plan.producerFormat,
       fps,
       quality,
       jobId,
@@ -172,7 +194,8 @@ export function registerRenderRoutes(api: Hono, adapter: StudioApiAdapter): void
       distinctId:
         typeof body.telemetryDistinctId === "string" ? body.telemetryDistinctId : undefined,
       telemetryOptOut: body.telemetryOptOut === true,
-    });
+    };
+    const jobState = startExportJob(adapter, options, plan, fps.num / fps.den);
     (jobState as RenderJobState & { createdAt: number }).createdAt = Date.now();
     renderJobs.set(jobId, jobState as RenderJobState & { createdAt: number });
 
@@ -334,14 +357,14 @@ export function registerRenderRoutes(api: Hono, adapter: StudioApiAdapter): void
     const rendersDir = adapter.rendersDir(project);
     if (!existsSync(rendersDir)) return c.json({ renders: [] });
     const files = readdirSync(rendersDir)
-      .filter((f) => f.endsWith(".mp4") || f.endsWith(".webm") || f.endsWith(".mov"))
+      .filter((f) => RENDER_EXTENSIONS.some((ext) => f.endsWith(ext)))
       .flatMap((f) => {
         const fp = resolveWithinProject(rendersDir, f);
         return fp && !isPrivateProjectFile(project.dir, fp) ? [{ f, fp }] : [];
       })
       .map(({ f, fp }) => {
         const stat = statSync(fp);
-        const rid = f.replace(/\.(mp4|webm|mov)$/, "");
+        const rid = f.slice(0, f.lastIndexOf("."));
         const metaPath = join(rendersDir, `${rid}.meta.json`);
         let status: "complete" | "failed" = "complete";
         let durationMs: number | undefined;

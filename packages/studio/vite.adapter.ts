@@ -9,7 +9,6 @@ import {
   writeFileSync,
   realpathSync,
   rmSync,
-  unlinkSync,
 } from "node:fs";
 import { basename, dirname, join, relative, resolve, isAbsolute, sep } from "node:path";
 import type { ViteDevServer } from "vite";
@@ -25,6 +24,7 @@ import {
   DEFAULT_HISTORY_ROOT,
   openProjectHistory,
   historyCache,
+  renderMetaPath,
 } from "@hyperframes/studio-server";
 import type { RegistryItem } from "@hyperframes/core/registry";
 import type { BundleOptions } from "@hyperframes/core/compiler";
@@ -361,12 +361,10 @@ export function createViteAdapter(
         // User-initiated cancel: not a failure. Remove any output so the
         // cancelled job doesn't resurrect in the render history.
         state.status = "cancelled";
-        for (const fp of [
-          opts.outputPath,
-          opts.outputPath.replace(/\.(mp4|webm|mov)$/, ".meta.json"),
-        ]) {
+        for (const fp of [opts.outputPath, renderMetaPath(opts.outputPath)]) {
           try {
-            if (existsSync(fp)) unlinkSync(fp);
+            // A PNG sequence's output is a folder.
+            if (existsSync(fp)) rmSync(fp, { recursive: true, force: true });
           } catch {
             /* ignore */
           }
@@ -385,6 +383,7 @@ export function createViteAdapter(
             fps: opts.fps,
             quality: opts.quality as "draft" | "standard" | "high",
             format: opts.format,
+            ...(opts.endSeconds !== undefined ? { endSeconds: opts.endSeconds } : {}),
             ...(renderBodyScripts.length > 0 ? { renderBodyScripts } : {}),
             outputResolution: opts.outputResolution,
             ...(opts.composition ? { entryFile: opts.composition } : {}),
@@ -415,7 +414,7 @@ export function createViteAdapter(
           if (job.audioLoweredDb !== undefined) state.audioLoweredDb = job.audioLoweredDb;
           state.status = "complete";
           state.progress = 100;
-          const metaPath = opts.outputPath.replace(/\.(mp4|webm|mov)$/, ".meta.json");
+          const metaPath = renderMetaPath(opts.outputPath);
           writeFileSync(
             metaPath,
             JSON.stringify({
@@ -432,7 +431,7 @@ export function createViteAdapter(
           state.status = "failed";
           state.error = err instanceof Error ? err.message : String(err);
           try {
-            const metaPath = opts.outputPath.replace(/\.(mp4|webm|mov)$/, ".meta.json");
+            const metaPath = renderMetaPath(opts.outputPath);
             writeFileSync(metaPath, JSON.stringify({ status: "failed" }));
           } catch {
             /* ignore */

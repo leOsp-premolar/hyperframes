@@ -12,7 +12,7 @@ previous one's tests.
 | S4    | `studio/s4-create-project` | Done    | New project from the header or the empty start screen; `POST /projects`  |
 | S2    | `studio/s2-media-metadata` | Done    | Media metadata on asset cards; upload validation                         |
 | S3    | `studio/s3-missing-media`  | Review  | Missing media detection and replacement                                  |
-| S1    |                            | Planned | Export the in/out range; audio-only export; GIF and PNG sequence options |
+| S1    | `studio/s1-export-options` | Review  | Export the in/out range; audio-only export; GIF and PNG sequence options |
 | S5    |                            | Planned | Slip and roll editing                                                    |
 | S6    |                            | Planned | Track lock and solo                                                      |
 | S7    |                            | Planned | Browser verification of keyframes and playback                           |
@@ -90,3 +90,39 @@ Other limits:
   check that a video answers before Mediabunny opens it, because its `Input.dispose()` leaves an
   unhandled rejection behind on a failed open; a file that answers but cannot be decoded still
   does. The check costs one one-byte request per video the first time it is drawn.
+
+Recorded with S1, for review.
+
+How an export option is made: the Renders panel offers MP4, MOV, WebM, GIF, PNG sequence (a
+zip) and audio as WAV, MP3 or M4A, over the whole timeline or the in/out range marked with I and
+O. The producer renders up to the out point (its new `endSeconds` option); when the range starts
+later, or the export is audio or frames, the server finishes the file before the job reports
+complete: it cuts the head, keeps only the sound, or zips the frames. A range's first frame is
+the frame the timeline shows at the in point (checked byte for byte against a whole-timeline PNG
+export). The header's Export now uses the settings last chosen in the panel, over the whole
+timeline.
+
+Limits:
+
+- **A range still renders from the start of the composition.** The producer stops at the out
+  point but renders the frames before the in point, which are then cut. Rendering only the range
+  needs a start offset in every capture path of the producer.
+- **Cutting the head re-encodes the video.** Near-lossless settings keep the codec, pixel format
+  and alpha (H.264 CRF 12, HEVC CRF 14, VP9 CRF 18, ProRes at its own profile), but it is a second
+  encode. A range starting at 0 and a whole-timeline export are not re-encoded.
+- **Audio exports render the picture too,** at draft quality, because the mix is made inside the
+  render; an audio-only path in the producer would skip the capture.
+- **GIF** has no sound and is capped at 30 fps (the producer's limit; the panel offers 24 or 30).
+- **PNG sequences are zipped without ZIP64**: at most 65,535 frames (about 36 minutes at 30 fps)
+  and 4 GiB.
+- **Only the I/O points set a range,** not a Shift-drag range selection on the ruler.
+- **The header's Export always exports the whole timeline,** with the panel's format.
+- **The CLI's `hyperframes preview` server** got the same adapter changes but only the development
+  Studio was tested in the browser.
+- **A producer test fails in this container with or without S1**:
+  `audioPadTrim.integration.test.ts` measures 4.3 dB against a 3 dB true-peak ceiling. The S0 and
+  S3 browser tests' ffprobe calls now end their options with `--`, as the repository's ffprobe
+  contract test requires; they did not before.
+- **Fixed in passing for S3:** the check that keeps Mediabunny away from missing videos now also
+  refuses an HTML page answering for one (the development server's fallback for a path it does
+  not have). That case let the S3 browser test fail now and then with the same unhandled error.

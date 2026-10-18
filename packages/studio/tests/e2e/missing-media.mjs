@@ -230,7 +230,7 @@ async function previewMedia(page) {
 function checkExport(outputPath, sourcePath, evidence, failures) {
   const probe = spawnSync(
     "ffprobe",
-    ["-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", outputPath],
+    ["-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", "--", outputPath],
     { encoding: "utf8" },
   );
   const duration = Number(probe.stdout.trim());

@@ -981,3 +981,69 @@ describe("audioLoweredDb — the limiter's attenuation reaches the host", () => 
     }
   });
 });
+
+describe("POST /projects/:id/render — export formats and range", () => {
+  async function post(body: Record<string, unknown>) {
+    const spy = vi.fn();
+    const { app, rendersDir, cleanup } = buildApp(spy);
+    try {
+      const res = await app.request("http://localhost/projects/demo/render", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      return { res, opts: spy.mock.calls[0]?.[0], rendersDir };
+    } finally {
+      cleanup();
+    }
+  }
+
+  it("renders a GIF at no more than 30 fps", async () => {
+    const { opts } = await post({ format: "gif", fps: 60 });
+    expect(opts).toMatchObject({ format: "gif", fps: { num: 30, den: 1 } });
+    expect(opts.outputPath).toMatch(/\.gif$/);
+  });
+
+  it("renders an audio export as a fast MP4 up to the out point, beside the final file", async () => {
+    const { opts, rendersDir } = await post({
+      format: "wav",
+      quality: "high",
+      range: { start: 1, end: 2.5 },
+    });
+    expect(opts).toMatchObject({ format: "mp4", quality: "draft", endSeconds: 2.5 });
+    expect(opts.outputPath).toBe(join(rendersDir, ".work", `${opts.jobId}.mp4`));
+  });
+
+  it("refuses a range it cannot export", async () => {
+    const { res, opts } = await post({ format: "mp4", range: { start: 3, end: 1 } });
+    expect(res.status).toBe(400);
+    expect(opts).toBeUndefined();
+  });
+
+  it("still renders MP4 for a format it does not know", async () => {
+    const { opts } = await post({ format: "hls" });
+    expect(opts.format).toBe("mp4");
+    expect(opts.endSeconds).toBeUndefined();
+  });
+});
+
+describe("GET /projects/:id/renders — every export kind", () => {
+  it("lists GIF, zip and audio exports by their job id", async () => {
+    const { app, rendersDir, cleanup } = buildApp(vi.fn());
+    try {
+      for (const name of ["a.gif", "b.zip", "c.wav", "d.mp3", "e.m4a", "notes.txt"]) {
+        writeFileSync(join(rendersDir, name), "x");
+      }
+      mkdirSync(join(rendersDir, ".work"));
+      const res = await app.request("http://localhost/projects/demo/renders");
+      const ids = (await res.json()).renders.map(
+        (r: { id: string; filename: string }) => r.filename,
+      );
+      expect(ids.sort()).toEqual(["a.gif", "b.zip", "c.wav", "d.mp3", "e.m4a"]);
+      const file = await app.request("http://localhost/projects/demo/renders/file/c.wav");
+      expect(file.headers.get("content-type")).toBe("audio/wav");
+    } finally {
+      cleanup();
+    }
+  });
+});

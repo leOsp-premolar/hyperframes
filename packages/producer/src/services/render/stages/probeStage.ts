@@ -108,6 +108,18 @@ function durationToFrameCount(duration: number, fps: number): number {
     : Math.ceil(rawFrameCount);
 }
 
+/**
+ * The seconds to render: the whole composition, or up to `endSeconds` when a caller asked to stop
+ * early (Studio's in/out export). A stop at or past the end, or one that is not a positive number,
+ * renders everything.
+ */
+export function renderDurationSeconds(compositionDuration: number, endSeconds?: number): number {
+  if (endSeconds === undefined || !Number.isFinite(endSeconds) || endSeconds <= 0) {
+    return compositionDuration;
+  }
+  return Math.min(compositionDuration, endSeconds);
+}
+
 export interface ProbeStageResult {
   /** May be reassigned from `recompileWithResolutions`. */
   compiled: CompiledComposition;
@@ -777,7 +789,7 @@ export async function runProbeStage(input: ProbeStageInput): Promise<ProbeStageR
   }
   const browserProbeMs = Date.now() - probeStart;
 
-  const duration = composition.duration;
+  const duration = renderDurationSeconds(composition.duration, job.config.endSeconds);
   const totalFrames = durationToFrameCount(duration, fpsToNumber(job.config.fps));
 
   if (duration <= 0) {

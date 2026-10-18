@@ -171,7 +171,10 @@ export interface StudioApiAdapter {
   startRender(opts: {
     project: ResolvedProject;
     outputPath: string;
-    format: "mp4" | "webm" | "mov";
+    /** `png-sequence` writes a folder of `frame_NNNNNN.png` (plus `audio.m4a`) at `outputPath`. */
+    format: "mp4" | "webm" | "mov" | "gif" | "png-sequence";
+    /** Stop the render this many seconds in (the producer's `endSeconds`); unset renders it all. */
+    endSeconds?: number;
     /**
      * Frame rate as an exact rational. The HTTP layer (POST
      * `/projects/:id/render`) accepts either a JSON number (integer fps,

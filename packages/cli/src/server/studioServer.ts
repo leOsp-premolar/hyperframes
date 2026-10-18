@@ -8,7 +8,7 @@
 import { Hono, type Context } from "hono";
 import { streamSSE } from "hono/streaming";
 import { realpath } from "@hyperframes/core";
-import { existsSync, readFileSync, statSync, writeFileSync, unlinkSync } from "node:fs";
+import { existsSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { replaceFileAtomically } from "@hyperframes/core/atomic-file";
 import { createHash } from "node:crypto";
 import { fileURLToPath } from "node:url";
@@ -63,6 +63,7 @@ import {
   HistoryBusyError,
   HistoryClosedError,
   historyCache,
+  renderMetaPath,
 } from "@hyperframes/studio-server";
 import { resolveAutoProxy } from "../utils/projectConfig.js";
 import {
@@ -599,12 +600,10 @@ export function createStudioServer(options: StudioServerOptions): StudioServer {
           // User-initiated cancel: not a failure. Remove any output so the
           // cancelled job doesn't resurrect in the render history.
           state.status = "cancelled";
-          for (const suffix of ["", ".meta.json"]) {
-            const fp = suffix
-              ? opts.outputPath.replace(/\.(mp4|webm|mov)$/, suffix)
-              : opts.outputPath;
+          for (const fp of [opts.outputPath, renderMetaPath(opts.outputPath)]) {
             try {
-              if (existsSync(fp)) unlinkSync(fp);
+              // A PNG sequence's output is a folder.
+              if (existsSync(fp)) rmSync(fp, { recursive: true, force: true });
             } catch {
               /* ignore */
             }
@@ -625,6 +624,7 @@ export function createStudioServer(options: StudioServerOptions): StudioServer {
             fps: opts.fps,
             quality: opts.quality as "draft" | "standard" | "high",
             format: opts.format,
+            ...(opts.endSeconds !== undefined ? { endSeconds: opts.endSeconds } : {}),
             outputResolution: opts.outputResolution,
             ...(manualEditsRenderScript ? { renderBodyScripts: [manualEditsRenderScript] } : {}),
             ...(opts.composition ? { entryFile: opts.composition } : {}),
@@ -656,7 +656,7 @@ export function createStudioServer(options: StudioServerOptions): StudioServer {
           if (job.audioLoweredDb !== undefined) state.audioLoweredDb = job.audioLoweredDb;
           state.status = "complete";
           state.progress = 100;
-          const metaPath = opts.outputPath.replace(/\.(mp4|webm|mov)$/, ".meta.json");
+          const metaPath = renderMetaPath(opts.outputPath);
           writeFileSync(
             metaPath,
             JSON.stringify({
@@ -690,7 +690,7 @@ export function createStudioServer(options: StudioServerOptions): StudioServer {
             cpu.stop(),
           );
           try {
-            const metaPath = opts.outputPath.replace(/\.(mp4|webm|mov)$/, ".meta.json");
+            const metaPath = renderMetaPath(opts.outputPath);
             writeFileSync(metaPath, JSON.stringify({ status: "failed" }));
           } catch {
             /* ignore */

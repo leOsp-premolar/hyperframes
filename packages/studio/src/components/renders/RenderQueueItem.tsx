@@ -1,10 +1,10 @@
 import { buildProjectApiPath } from "../../utils/projectRouting";
 import { memo, useCallback, useState } from "react";
-import { VideoFrameThumbnail } from "../ui/VideoFrameThumbnail";
 import { Button } from "../ui/Button";
 import { IconButton } from "../ui/IconButton";
 import { Tooltip } from "../ui/Tooltip";
 import type { RenderJob } from "./useRenderQueue";
+import { RenderThumbnail } from "./RenderFilePreview";
 
 interface RenderQueueItemProps {
   job: RenderJob;
@@ -35,7 +35,6 @@ export const RenderQueueItem = memo(function RenderQueueItem({
   onCancel,
 }: RenderQueueItemProps) {
   const [hovered, setHovered] = useState(false);
-  const [videoReady, setVideoReady] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
 
   // Direct file URL — serves from disk, survives server restarts
@@ -56,7 +55,6 @@ export const RenderQueueItem = memo(function RenderQueueItem({
     [fileSrc, job.filename],
   );
 
-  const viewSrc = fileSrc;
   const isComplete = job.status === "complete";
   const isRendering = job.status === "rendering";
 
@@ -65,7 +63,6 @@ export const RenderQueueItem = memo(function RenderQueueItem({
       onPointerEnter={() => setHovered(true)}
       onPointerLeave={() => {
         setHovered(false);
-        setVideoReady(false);
         setConfirmingDelete(false);
       }}
       className="px-3 py-2.5 border-b border-border last:border-0 transition-colors duration-150 hover:bg-hover/30"
@@ -84,45 +81,7 @@ export const RenderQueueItem = memo(function RenderQueueItem({
             isComplete ? "cursor-pointer" : "cursor-default",
           ].join(" ")}
         >
-          {isComplete && (
-            <>
-              {/* Live video — fades in over the static frame once it can play */}
-              {hovered && (
-                <video
-                  src={viewSrc}
-                  autoPlay
-                  muted
-                  loop
-                  playsInline
-                  onCanPlay={() => setVideoReady(true)}
-                  className="absolute inset-0 w-full h-full object-contain transition-opacity duration-150"
-                  style={{ opacity: videoReady ? 1 : 0 }}
-                />
-              )}
-              {/* Static frame — visible when not hovering */}
-              <div
-                className="absolute inset-0 transition-opacity duration-150"
-                style={{ opacity: hovered && videoReady ? 0 : 1 }}
-              >
-                <VideoFrameThumbnail src={viewSrc} />
-              </div>
-            </>
-          )}
-          {isRendering && (
-            <div className="w-full h-full flex items-center justify-center">
-              <div className="w-2 h-2 rounded-full bg-accent animate-pulse motion-reduce:animate-none" />
-            </div>
-          )}
-          {job.status === "failed" && (
-            <div className="w-full h-full flex items-center justify-center">
-              <div className="w-2 h-2 rounded-full bg-danger-ink" />
-            </div>
-          )}
-          {job.status === "cancelled" && (
-            <div className="w-full h-full flex items-center justify-center">
-              <div className="w-2 h-2 rounded-full bg-text-5" />
-            </div>
-          )}
+          <RenderThumbnail job={job} src={fileSrc} hovered={hovered} />
         </button>
 
         {/* Info */}

@@ -65,3 +65,27 @@ describe("GPU encoding", () => {
     expect(body["gpu"]).toBeUndefined();
   });
 });
+
+describe("export options", () => {
+  afterEach(() => localStorage.clear());
+
+  it("sends the in/out range and the chosen export format", async () => {
+    const body = await renderBody(null, { format: "png-sequence", range: { start: 1, end: 2 } });
+    expect(body).toMatchObject({ format: "png-sequence", range: { start: 1, end: 2 } });
+  });
+
+  it("exports the whole timeline when no range is given", async () => {
+    const body = await renderBody(null, { format: "gif" });
+    expect(body["range"]).toBeUndefined();
+  });
+
+  it("uses the Renders panel's saved settings when the caller names none", async () => {
+    // The header's Export button passes no options.
+    localStorage.setItem(
+      "hf-studio-render-settings",
+      JSON.stringify({ format: "mp3", quality: "high", fps: 24, gpu: false }),
+    );
+    const body = await renderBody(null, undefined);
+    expect(body).toMatchObject({ format: "mp3", quality: "high", fps: 24 });
+  });
+});

@@ -10,6 +10,7 @@ import {
   hasAutoStartVideos,
   hasScriptedAudioVolumeAutomation,
   hasVariableBoundMedia,
+  renderDurationSeconds,
 } from "./probeStage.js";
 
 // ── Mocks for runProbeStage tests ────────────────────────────────────────────
@@ -1128,5 +1129,17 @@ describe("runProbeStage — transient browser error retry (#1687)", () => {
     expect(closeCaptureSessionCallCount).toBe(0);
     expect(result.duration).toBe(5);
     expect(result.probeSession).not.toBeNull();
+  });
+});
+
+describe("renderDurationSeconds", () => {
+  it("renders the whole composition unless asked to stop earlier", () => {
+    expect(renderDurationSeconds(6)).toBe(6);
+    expect(renderDurationSeconds(6, 2.5)).toBe(2.5);
+    expect(renderDurationSeconds(6, 9)).toBe(6);
+  });
+
+  it.each([0, -1, Number.NaN, Number.POSITIVE_INFINITY])("ignores a stop of %s", (end) => {
+    expect(renderDurationSeconds(6, end)).toBe(6);
   });
 });

@@ -9,6 +9,7 @@ import { buttonBase, buttonSizes, buttonVariants, cn } from "../ui";
 import { isTypingTarget } from "../../utils/typingTarget";
 import { shouldIgnorePlaybackShortcutTarget } from "../../player/lib/playbackShortcuts";
 import type { FfmpegStatus } from "./useFfmpegStatus";
+import { usePlayerStore } from "../../player";
 
 // Encoder availability arrives as a prop (useRenderQueue owns the probe), so
 // each case just states the environment it is about.
@@ -142,7 +143,7 @@ describe("RenderQueue controls", () => {
       exportButtonIn(host).dispatchEvent(new MouseEvent("click", { bubbles: true }));
     });
 
-    expect(onStartRender).toHaveBeenCalledWith("mp4", "standard", "landscape-4k", 30, false);
+    expect(onStartRender).toHaveBeenCalledWith("mp4", "standard", "landscape-4k", 30, false, null);
   });
 
   it("refuses a resolution the composition cannot reach, and says why", async () => {
@@ -172,7 +173,7 @@ describe("RenderQueue controls", () => {
       exportButtonIn(host).dispatchEvent(new MouseEvent("click", { bubbles: true }));
     });
 
-    expect(onStartRender).toHaveBeenCalledWith("mp4", "standard", "auto", 30, false);
+    expect(onStartRender).toHaveBeenCalledWith("mp4", "standard", "auto", 30, false, null);
   });
 
   it("exports with GPU encoding once the box is ticked, and remembers it", () => {
@@ -187,7 +188,7 @@ describe("RenderQueue controls", () => {
       exportButtonIn(host).dispatchEvent(new MouseEvent("click", { bubbles: true }));
     });
 
-    expect(onStartRender).toHaveBeenCalledWith("mp4", "standard", "auto", 30, true);
+    expect(onStartRender).toHaveBeenCalledWith("mp4", "standard", "auto", 30, true, null);
     expect(getPersistedRenderSettings().gpu).toBe(true);
   });
 
@@ -204,6 +205,52 @@ describe("RenderQueue controls", () => {
       gpu: false,
     });
     expect(host.textContent).not.toContain("Use GPU encoding");
+  });
+});
+
+describe("RenderQueue export options", () => {
+  afterEach(() => act(() => usePlayerStore.setState({ inPoint: null, outPoint: null })));
+  const labels = (host: HTMLElement) =>
+    [...host.querySelectorAll("span")].map((el) => el.textContent).filter(Boolean);
+
+  it("exports the in/out range once it is chosen, and only then", async () => {
+    act(() => usePlayerStore.setState({ duration: 6, inPoint: 1.5, outPoint: 4 }));
+    const onStartRender: Mock<StartRenderHandler> = vi.fn();
+    const host = mountRenderQueue(onStartRender);
+    expect(host.textContent).toContain("Whole timeline");
+    await chooseByArrowing(triggerFor(host, "Range"), 1);
+    expect(host.textContent).toContain("In to out: 00:01.50 to 00:04.00 (2.50s)");
+    act(() => exportButtonIn(host).click());
+    expect(onStartRender).toHaveBeenCalledWith("mp4", "standard", "auto", 30, false, {
+      start: 1.5,
+      end: 4,
+    });
+  });
+
+  it("says how to mark a range when none is set", () => {
+    const host = mountRenderQueue(vi.fn());
+    const trigger = triggerFor(host, "Range");
+    expect(trigger.textContent).toContain("Whole timeline");
+    expect(document.body.innerHTML).not.toContain("In to out:");
+  });
+
+  it("offers GIF at 30 fps at most, and audio with no picture settings", async () => {
+    localStorage.setItem(
+      "hf-studio-render-settings",
+      JSON.stringify({ format: "gif", quality: "standard", fps: 60 }),
+    );
+    const onStartRender: Mock<StartRenderHandler> = vi.fn();
+    let host = mountRenderQueue(onStartRender);
+    act(() => exportButtonIn(host).click());
+    expect(onStartRender).toHaveBeenLastCalledWith("gif", "standard", "auto", 30, false, null);
+    expect(labels(host)).not.toContain("Quality");
+
+    act(() => root?.unmount());
+    localStorage.setItem("hf-studio-render-settings", JSON.stringify({ format: "wav" }));
+    host = mountRenderQueue(onStartRender);
+    expect(labels(host)).not.toContain("Frame rate");
+    expect(labels(host)).not.toContain("Resolution");
+    expect(labels(host)).toContain("Range");
   });
 });
 

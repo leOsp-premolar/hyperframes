@@ -6,12 +6,22 @@ import { FfmpegRequiredNotice } from "./FfmpegRequiredNotice";
 import type { FfmpegStatus } from "./useFfmpegStatus";
 import { Button } from "../ui/Button";
 import { IconButton } from "../ui/IconButton";
-import { Select, type SelectOption } from "../ui/Select";
+import { Select } from "../ui/Select";
 import { Tooltip } from "../ui/Tooltip";
 import { resolveFloatingPanelPosition, type FloatingPosition } from "../editor/floatingPanel";
 import type { RenderJob, ResolutionPreset } from "./useRenderQueue";
 import { getPersistedRenderSettings, persistRenderSettings } from "./renderSettings";
 import { GpuEncodingToggle } from "./GpuEncodingToggle";
+import { ExportRangeField, useMarkedRange } from "./ExportRangeField";
+import { exportFpsFor, FrameRateField, QualityField } from "./ExportFields";
+import {
+  FORMAT_INFO,
+  FORMAT_OPTIONS,
+  hasPicture,
+  type ExportFormat,
+  type ExportFps,
+  type ExportRange,
+} from "./exportFormats";
 import { trackStudioEvent } from "../../utils/studioTelemetry";
 
 export interface CompositionDimensions {
@@ -20,11 +30,13 @@ export interface CompositionDimensions {
 }
 
 export type StartRenderHandler = (
-  format: "mp4" | "webm" | "mov",
+  format: ExportFormat,
   quality: "draft" | "standard" | "high",
   resolution: ResolutionPreset | "auto",
-  fps: 24 | 30 | 60,
+  fps: ExportFps,
   gpu?: boolean,
+  /** The timeline's in/out range, or null for the whole timeline. */
+  range?: ExportRange | null,
 ) => void | Promise<void>;
 
 export interface RenderQueueProps {
@@ -136,18 +148,6 @@ function scaleOptionLabel(
   return base;
 }
 
-const FORMAT_INFO: Record<"mp4" | "webm" | "mov", { label: string; desc: string }> = {
-  mp4: { label: "MP4", desc: "Best for general use. Smallest file, universal playback." },
-  mov: {
-    label: "MOV (ProRes 4444)",
-    desc: "Transparent video. Works in Final Cut Pro, DaVinci Resolve, and most video editors. Large files.",
-  },
-  webm: {
-    label: "WebM (VP9)",
-    desc: "Transparent video for web. Smaller than MOV but limited editor support.",
-  },
-};
-
 // Estimated, like COLOR_PICKER_SIZE in propertyPanelColor: only the flip
 // decision uses the height, and the clamp keeps the panel on screen either way.
 const FORMAT_PANEL_SIZE = { width: 208, height: 150 };
@@ -158,7 +158,7 @@ const FORMAT_PANEL_SIZE = { width: 208, height: 150 };
 // for the one-line ui/Tooltip primitive, so this stays a local popover.
 // It renders in a portal because the right panel is overflow-hidden: an
 // in-flow absolute panel gets clipped at the panel edge.
-function FormatInfoTooltip({ format }: { format: "mp4" | "webm" | "mov" }) {
+function FormatInfoTooltip({ format }: { format: ExportFormat }) {
   const [open, setOpen] = useState(false);
   const [position, setPosition] = useState<FloatingPosition | null>(null);
   const triggerRef = useRef<HTMLDivElement>(null);
@@ -206,7 +206,7 @@ function FormatInfoTooltip({ format }: { format: "mp4" | "webm" | "mov" }) {
     <div ref={triggerRef} className="relative" onPointerEnter={show} onPointerLeave={hide}>
       <button
         type="button"
-        aria-label="About video formats"
+        aria-label="About export formats"
         aria-expanded={open}
         aria-describedby={open ? panelId : undefined}
         onFocus={show}
@@ -242,41 +242,12 @@ function FormatInfoTooltip({ format }: { format: "mp4" | "webm" | "mov" }) {
           >
             <p className="text-step-10 font-semibold text-text-1 mb-0.5">{info.label}</p>
             <p className="text-step-9 text-text-3 leading-tight">{info.desc}</p>
-            <div className="mt-1.5 pt-1.5 border-t border-border">
-              {(["mp4", "mov", "webm"] as const)
-                .filter((f) => f !== format)
-                .map((f) => (
-                  <p key={f} className="text-step-9 text-text-4 leading-relaxed">
-                    <span className="text-text-3 font-medium">{FORMAT_INFO[f].label}</span>
-                    {": "}
-                    {FORMAT_INFO[f].desc}
-                  </p>
-                ))}
-            </div>
           </div>,
           document.body,
         )}
     </div>
   );
 }
-
-const FORMAT_OPTIONS: SelectOption[] = [
-  { value: "mp4", label: "MP4" },
-  { value: "mov", label: "MOV (ProRes)" },
-  { value: "webm", label: "WebM" },
-];
-
-const QUALITY_OPTIONS: SelectOption[] = [
-  { value: "draft", label: "Draft" },
-  { value: "standard", label: "Standard" },
-  { value: "high", label: "High Quality" },
-];
-
-const FPS_OPTIONS: SelectOption[] = [
-  { value: "24", label: "24 fps" },
-  { value: "30", label: "30 fps" },
-  { value: "60", label: "60 fps" },
-];
 
 function formatEta(ms: number): string {
   const s = Math.round(ms / 1000);
@@ -301,11 +272,15 @@ function FormatExportButton({
   onRecheckFfmpeg: () => void;
 }) {
   const persisted = getPersistedRenderSettings();
-  const [format, setFormat] = useState<"mp4" | "webm" | "mov">(persisted.format);
+  const [format, setFormat] = useState<ExportFormat>(persisted.format);
   const [quality, setQuality] = useState<"draft" | "standard" | "high">(persisted.quality);
   const [resolution, setResolution] = useState<RenderScale>("auto");
-  const [fps, setFps] = useState<24 | 30 | 60>(persisted.fps);
+  const [fps, setFps] = useState<ExportFps>(persisted.fps);
   const [gpu, setGpu] = useState(persisted.gpu);
+  const marked = useMarkedRange();
+  const [useMarked, setUseMarked] = useState(false);
+  // A GIF caps at 30 fps; the saved rate stays for the next video export.
+  const exportFps = exportFpsFor(format, fps);
 
   // Only a definite "not installed" blocks Export. A null status means the
   // probe gave no answer, and refusing to export on no answer would break
@@ -313,8 +288,7 @@ function FormatExportButton({
   // boolean keeps the notice from re-testing what this line already decided.
   const missingFfmpeg = ffmpeg && !ffmpeg.ok ? ffmpeg : null;
 
-  // MOV (ProRes) is a fixed-quality codec — quality selector has no effect.
-  const showQuality = format !== "mov";
+  const picture = hasPicture(format);
 
   return (
     <div className="flex flex-col gap-3">
@@ -337,56 +311,52 @@ function FormatExportButton({
             options={FORMAT_OPTIONS}
             disabled={isRendering}
             onCommit={(next) => {
-              const v = next as "mp4" | "webm" | "mov";
+              const v = next as ExportFormat;
               setFormat(v);
               persistRenderSettings(v, quality, fps);
             }}
           />
         </div>
-        <div className="flex flex-col gap-1">
-          <span className="text-step-10 text-text-4">Resolution</span>
-          <Select
-            label="Resolution"
-            value={resolution}
-            options={SCALE_OPTION_ORDER.map((value) => ({
-              value,
-              label: scaleOptionLabel(value, compositionDimensions),
-              disabled: !scaleApplies(value, compositionDimensions),
-            }))}
-            disabled={isRendering}
-            onCommit={(next) => setResolution(next as RenderScale)}
-          />
-        </div>
-        <div className="flex flex-col gap-1">
-          <span className="text-step-10 text-text-4">Frame rate</span>
-          <Select
-            label="Frame rate"
-            value={String(fps)}
-            options={FPS_OPTIONS}
-            disabled={isRendering}
-            onCommit={(next) => {
-              const v = Number(next) as 24 | 30 | 60;
-              setFps(v);
-              persistRenderSettings(format, quality, v);
-            }}
-          />
-        </div>
-        {showQuality && (
+        <ExportRangeField
+          marked={marked}
+          useMarked={useMarked}
+          disabled={isRendering}
+          onChange={setUseMarked}
+        />
+        {picture && (
           <div className="flex flex-col gap-1">
-            <span className="text-step-10 text-text-4">Quality</span>
+            <span className="text-step-10 text-text-4">Resolution</span>
             <Select
-              label="Quality"
-              value={quality}
-              options={QUALITY_OPTIONS}
+              label="Resolution"
+              value={resolution}
+              options={SCALE_OPTION_ORDER.map((value) => ({
+                value,
+                label: scaleOptionLabel(value, compositionDimensions),
+                disabled: !scaleApplies(value, compositionDimensions),
+              }))}
               disabled={isRendering}
-              onCommit={(next) => {
-                const v = next as "draft" | "standard" | "high";
-                setQuality(v);
-                persistRenderSettings(format, v, fps);
-              }}
+              onCommit={(next) => setResolution(next as RenderScale)}
             />
           </div>
         )}
+        <FrameRateField
+          format={format}
+          fps={fps}
+          disabled={isRendering}
+          onChange={(v) => {
+            setFps(v);
+            persistRenderSettings(format, quality, v);
+          }}
+        />
+        <QualityField
+          format={format}
+          quality={quality}
+          disabled={isRendering}
+          onChange={(v) => {
+            setQuality(v);
+            persistRenderSettings(format, v, fps);
+          }}
+        />
       </div>
       <GpuEncodingToggle
         format={format}
@@ -409,8 +379,15 @@ function FormatExportButton({
           // double-click in the same frame from enqueueing two renders.
           if (isRendering || missingFfmpeg) return;
           const outputResolution = resolveResolution(resolution, compositionDimensions);
-          trackStudioEvent("render_start", { format, quality, resolution: outputResolution, fps });
-          void onStartRender(format, quality, outputResolution, fps, gpu);
+          const range = useMarked ? marked : null;
+          trackStudioEvent("render_start", {
+            format,
+            quality,
+            resolution: outputResolution,
+            fps: exportFps,
+            range: range !== null,
+          });
+          void onStartRender(format, quality, outputResolution, exportFps, gpu, range);
         }}
         // Width only. A type size or a weight here would win the merge against
         // the size recipe and leave this Export a step away from the header's

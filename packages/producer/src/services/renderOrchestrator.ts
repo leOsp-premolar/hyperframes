@@ -374,6 +374,12 @@ export interface RenderConfig {
   /** GIF Netscape loop count. 0 means infinite looping. Only used with `format: "gif"`. */
   gifLoop?: number;
   /**
+   * Stop the render this many seconds into the composition: the output is the composition's first
+   * `endSeconds`, picture and sound. Unset, or at or past the end, renders it all. Studio's in/out
+   * export renders up to the out point with this and trims the head itself.
+   */
+  endSeconds?: number;
+  /**
    * HLS target segment length in whole seconds. Defaults to 4. Only used with
    * `format: "hls"`; ignored for every other format.
    *

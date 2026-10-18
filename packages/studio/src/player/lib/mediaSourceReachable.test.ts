@@ -27,3 +27,13 @@ it("treats a failed request as unreachable, but lets a cancellation through", as
   controller.abort();
   await expect(mediaSourceReachable("/a.mp4", controller.signal)).rejects.toThrow("offline");
 });
+
+it("treats an HTML page answering for a missing file as unreachable", async () => {
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(
+      async () => new Response("<!doctype html>", { headers: { "content-type": "text/html" } }),
+    ),
+  );
+  expect(await mediaSourceReachable("/assets/missing.mov")).toBe(false);
+});

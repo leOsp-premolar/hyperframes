@@ -332,6 +332,7 @@ function checkStreams(outputPath, frameSize, evidence, failures) {
       "format=duration:stream=codec_type,codec_name,width,height,r_frame_rate",
       "-of",
       "json",
+      "--",
       outputPath,
     ]),
   );
@@ -457,7 +458,7 @@ async function waitForSavedClips(projectDir, predicate, timeoutMs = 15_000) {
 }
 
 /** Read the job's progress stream until it leaves "rendering"; the last event is the outcome. */
-async function followRender(origin, jobId, timeoutMs) {
+export async function followRender(origin, jobId, timeoutMs) {
   const body = await streamBody(
     `${origin}/api/render/${encodeURIComponent(jobId)}/progress`,
     timeoutMs,
@@ -517,7 +518,7 @@ export function framePsnr(a, at, b, bt) {
   return m[1] === "inf" ? Infinity : Number(m[1]);
 }
 
-function meanVolume(file, from, length) {
+export function meanVolume(file, from, length) {
   const r = spawnSync(
     "ffmpeg",
     [
