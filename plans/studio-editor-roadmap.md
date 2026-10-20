@@ -6,17 +6,17 @@ previous one's tests.
 
 ## Stages
 
-| Stage | Branch                         | State  | Scope                                                                    |
-| ----- | ------------------------------ | ------ | ------------------------------------------------------------------------ |
-| S0    | `studio/s0-e2e-workflow`       | Done   | Browser gate: import, place, split, trim, undo/redo, reload, export      |
-| S4    | `studio/s4-create-project`     | Done   | New project from the header or the empty start screen; `POST /projects`  |
-| S2    | `studio/s2-media-metadata`     | Done   | Media metadata on asset cards; upload validation                         |
-| S3    | `studio/s3-missing-media`      | Done   | Missing media detection and replacement                                  |
-| S1    | `studio/s1-export-options`     | Done   | Export the in/out range; audio-only export; GIF and PNG sequence options |
-| S5    | `studio/s5-slip-roll`          | Done   | Slip and roll editing                                                    |
-| S6    | `studio/s6-track-lock-solo`    | Done   | Track lock and solo                                                      |
-| S7    | `studio/s7-keyframes-playback` | Done   | Browser verification of keyframes and playback                           |
-| S8    | `studio/s8-voice-api`          | Review | Voice API: ElevenLabs and OpenAI voices in the CLI, the API and Studio   |
+| Stage | Branch                         | State | Scope                                                                    |
+| ----- | ------------------------------ | ----- | ------------------------------------------------------------------------ |
+| S0    | `studio/s0-e2e-workflow`       | Done  | Browser gate: import, place, split, trim, undo/redo, reload, export      |
+| S4    | `studio/s4-create-project`     | Done  | New project from the header or the empty start screen; `POST /projects`  |
+| S2    | `studio/s2-media-metadata`     | Done  | Media metadata on asset cards; upload validation                         |
+| S3    | `studio/s3-missing-media`      | Done  | Missing media detection and replacement                                  |
+| S1    | `studio/s1-export-options`     | Done  | Export the in/out range; audio-only export; GIF and PNG sequence options |
+| S5    | `studio/s5-slip-roll`          | Done  | Slip and roll editing                                                    |
+| S6    | `studio/s6-track-lock-solo`    | Done  | Track lock and solo                                                      |
+| S7    | `studio/s7-keyframes-playback` | Done  | Browser verification of keyframes and playback                           |
+| S8    | `studio/s8-voice-api`          | Done  | Voice API: ElevenLabs and OpenAI voices in the CLI, the API and Studio   |
 
 ## Known limitations to plan for
 
@@ -271,10 +271,12 @@ test serves itself):
 
 Limits:
 
-- **No real provider was called.** This container cannot reach api.elevenlabs.io or
-  api.openai.com, and there is no key here. Request and response shapes follow the providers'
-  published APIs and are covered by stand-ins and unit tests, so the first run with a real key
-  should still be checked by ear.
+- **ElevenLabs was then checked for real, OpenAI was not.** With a free ElevenLabs key, Studio
+  listed the account's 21 voices and spoke two takes (a chosen voice at 0.9× and the default),
+  each in about 1.5 s, and `tts --words` returned ElevenLabs' own word timings. That run found
+  the default voice, Rachel, refused with a 402 on a free plan ("Free users cannot use library
+  voices via the API"); the default is now Sarah, which every account has. The media-use skill
+  scripts still default to Rachel. OpenAI is covered by stand-ins and unit tests only.
 - **OpenAI and Kokoro have no word timings of their own;** `words` transcribes the result
   locally, which needs the whisper or Parakeet runtime.
 - **Studio waits for the whole line** (up to 120 s) with no progress or cancel button. Closing the
