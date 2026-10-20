@@ -6,18 +6,18 @@ previous one's tests.
 
 ## Stages
 
-| Stage | Branch                         | State  | Scope                                                                                |
-| ----- | ------------------------------ | ------ | ------------------------------------------------------------------------------------ |
-| S0    | `studio/s0-e2e-workflow`       | Done   | Browser gate: import, place, split, trim, undo/redo, reload, export                  |
-| S4    | `studio/s4-create-project`     | Done   | New project from the header or the empty start screen; `POST /projects`              |
-| S2    | `studio/s2-media-metadata`     | Done   | Media metadata on asset cards; upload validation                                     |
-| S3    | `studio/s3-missing-media`      | Done   | Missing media detection and replacement                                              |
-| S1    | `studio/s1-export-options`     | Done   | Export the in/out range; audio-only export; GIF and PNG sequence options             |
-| S5    | `studio/s5-slip-roll`          | Done   | Slip and roll editing                                                                |
-| S6    | `studio/s6-track-lock-solo`    | Done   | Track lock and solo                                                                  |
-| S7    | `studio/s7-keyframes-playback` | Done   | Browser verification of keyframes and playback                                       |
-| S8    | `studio/s8-voice-api`          | Done   | Voice API: ElevenLabs and OpenAI voices in the CLI, the API and Studio               |
-| S9    | `studio/s9-voice-library`      | Review | Studio voices: ten natural ElevenLabs voices for Spanish, high to low, women and men |
+| Stage | Branch                         | State | Scope                                                                                |
+| ----- | ------------------------------ | ----- | ------------------------------------------------------------------------------------ |
+| S0    | `studio/s0-e2e-workflow`       | Done  | Browser gate: import, place, split, trim, undo/redo, reload, export                  |
+| S4    | `studio/s4-create-project`     | Done  | New project from the header or the empty start screen; `POST /projects`              |
+| S2    | `studio/s2-media-metadata`     | Done  | Media metadata on asset cards; upload validation                                     |
+| S3    | `studio/s3-missing-media`      | Done  | Missing media detection and replacement                                              |
+| S1    | `studio/s1-export-options`     | Done  | Export the in/out range; audio-only export; GIF and PNG sequence options             |
+| S5    | `studio/s5-slip-roll`          | Done  | Slip and roll editing                                                                |
+| S6    | `studio/s6-track-lock-solo`    | Done  | Track lock and solo                                                                  |
+| S7    | `studio/s7-keyframes-playback` | Done  | Browser verification of keyframes and playback                                       |
+| S8    | `studio/s8-voice-api`          | Done  | Voice API: ElevenLabs and OpenAI voices in the CLI, the API and Studio               |
+| S9    | `studio/s9-voice-library`      | Done  | Studio voices: ten natural ElevenLabs voices for Spanish, high to low, women and men |
 
 ## Known limitations to plan for
 
