@@ -6,18 +6,18 @@ previous one's tests.
 
 ## Stages
 
-| Stage | Branch                         | State  | Scope                                                                       |
-| ----- | ------------------------------ | ------ | --------------------------------------------------------------------------- |
-| S0    | `studio/s0-e2e-workflow`       | Done   | Browser gate: import, place, split, trim, undo/redo, reload, export         |
-| S4    | `studio/s4-create-project`     | Done   | New project from the header or the empty start screen; `POST /projects`     |
-| S2    | `studio/s2-media-metadata`     | Done   | Media metadata on asset cards; upload validation                            |
-| S3    | `studio/s3-missing-media`      | Done   | Missing media detection and replacement                                     |
-| S1    | `studio/s1-export-options`     | Done   | Export the in/out range; audio-only export; GIF and PNG sequence options    |
-| S5    | `studio/s5-slip-roll`          | Done   | Slip and roll editing                                                       |
-| S6    | `studio/s6-track-lock-solo`    | Done   | Track lock and solo                                                         |
-| S7    | `studio/s7-keyframes-playback` | Done   | Browser verification of keyframes and playback                              |
-| S8    | `studio/s8-voice-api`          | Done   | Voice API: ElevenLabs and OpenAI voices in the CLI, the API and Studio      |
-| S9    | `studio/s9-voice-library`      | Review | Studio voices: ten Spanish voices from very high to very low, women and men |
+| Stage | Branch                         | State  | Scope                                                                                |
+| ----- | ------------------------------ | ------ | ------------------------------------------------------------------------------------ |
+| S0    | `studio/s0-e2e-workflow`       | Done   | Browser gate: import, place, split, trim, undo/redo, reload, export                  |
+| S4    | `studio/s4-create-project`     | Done   | New project from the header or the empty start screen; `POST /projects`              |
+| S2    | `studio/s2-media-metadata`     | Done   | Media metadata on asset cards; upload validation                                     |
+| S3    | `studio/s3-missing-media`      | Done   | Missing media detection and replacement                                              |
+| S1    | `studio/s1-export-options`     | Done   | Export the in/out range; audio-only export; GIF and PNG sequence options             |
+| S5    | `studio/s5-slip-roll`          | Done   | Slip and roll editing                                                                |
+| S6    | `studio/s6-track-lock-solo`    | Done   | Track lock and solo                                                                  |
+| S7    | `studio/s7-keyframes-playback` | Done   | Browser verification of keyframes and playback                                       |
+| S8    | `studio/s8-voice-api`          | Done   | Voice API: ElevenLabs and OpenAI voices in the CLI, the API and Studio               |
+| S9    | `studio/s9-voice-library`      | Review | Studio voices: ten natural ElevenLabs voices for Spanish, high to low, women and men |
 
 ## Known limitations to plan for
 
@@ -292,86 +292,50 @@ Limits:
 
 Recorded with S9, for review.
 
-The voice engine gains a `studio` provider with ten voices of its own, in Spanish, from very
-high to very low: Aurora, Brisa, Clara, Dalia and Elena (women), Fabián, Gael, Hugo, Íker and
-Joaquín (men). Each is an account voice moved a little:
+The voice engine gains a `studio` provider with ten voices for Spanish narration, from high to
+low: Aurora, Brisa, Clara, Dalia and Elena (women), Fabián, Gael, Hugo, Íker and Joaquín (men).
+Each is one of the voices every ElevenLabs account has, used as ElevenLabs speaks it. They
+differ in who speaks and in ElevenLabs' own delivery settings (stability 0.4–0.6, style
+0.05–0.3); nothing is applied to the audio afterwards.
 
-- **Pitch:** rubberband changes the pitch with the formants held.
-- **Timbre:** asetrate moves the formants by at most 6%, and rubberband restores the length, so
-  words keep their timings.
-- **Tone:** bass and treble shelves of at most 2.5 dB.
+How the set was chosen:
 
-How the ladder was built:
+1. **Survey.** Praat measured every account voice speaking the same Spanish line: median pitch,
+   its 10–90% range, F1–F3, spectral centre and harmonics-to-noise ratio. From high to low (Hz):
+   Alice 213, Bella 212, Matilda 210, Sarah 187, Jessica 186, River 185, Laura 182, Eric 163,
+   Lily 159, Daniel 140, Roger 131, George 124, Charlie 123, Bill 121, Will 116, Liam 115,
+   Adam 111, Chris 108, Brian 105, Callum 98.
+2. **Pick.** Five women and five men spread across that range, preferring narration voices and
+   voices whose pitch varies less within a line:
+   - Women: Bella 212, Matilda 210, Sarah 187, Jessica 186 and Lily 159.
+   - Men: Eric 163, Daniel 140, George 124, Will 116 and Brian 105.
 
-1. **Survey.** Praat measured the ElevenLabs account voices:
-   - Sixteen from their English previews. Laura, Charlie, George, Brian and Daniel serve
-     previews from a host this container cannot reach.
-   - Then each candidate speaking the same Spanish line: median pitch, its 10–90% range,
-     F1–F3, spectral centre and harmonics-to-noise ratio.
-   - The Kokoro Spanish voices were measured the same way.
+What was tried first and dropped:
 
-   In Spanish, from high to low:
-
-   | Voice         | Median pitch (Hz) |
-   | ------------- | ----------------- |
-   | Bella         | 212               |
-   | Matilda       | 210               |
-   | Sarah         | 187               |
-   | Jessica       | 186               |
-   | Eric          | 163               |
-   | Daniel        | 140               |
-   | Roger         | 131               |
-   | George        | 124               |
-   | Bill          | 121               |
-   | Will          | 116               |
-   | Liam          | 115               |
-   | Adam          | 111               |
-   | Chris         | 108               |
-   | Brian         | 105               |
-   | Callum        | 98                |
-   | Dora (Kokoro) | 174               |
-   | Alex (Kokoro) | 123               |
-
-2. **Bases.** Each voice starts from the base nearest its target, preferring voices whose
-   pitch varies less. Liam, Matilda and Chris swing 14 to 17 semitones within a line. George
-   and Brian replaced Liam and Chris for Íker and Joaquín.
-
-3. **Per-line correction.** Fixed offsets were not enough: ElevenLabs reads each line
-   differently, and on a second sentence Clara landed at 248 Hz (target 205) and Íker at 139
-   (target 105).
-   - The engine now measures every base line with its own YIN pitch tracker and moves it to the
-     target, at most 4 semitones on ElevenLabs and 6 on Kokoro.
-   - A line it cannot measure gets the fixed offset.
-   - On two different sentences (a statement and a question), all ten landed in order. Praat
-     read every line within 8 Hz of its target, Gael 5 and 8 Hz low, the rest within 3 Hz:
-
-   | Voice   | Target (Hz) | Statement (Hz) | Question (Hz) |
-   | ------- | ----------- | -------------- | ------------- |
-   | Aurora  | 245         | 245            | 237           |
-   | Brisa   | 225         | 224            | 224           |
-   | Clara   | 205         | 205            | 205           |
-   | Dalia   | 185         | 183            | 183           |
-   | Elena   | 165         | 165            | 162           |
-   | Fabián  | 150         | 148            | 148           |
-   | Gael    | 135         | 130            | 127           |
-   | Hugo    | 120         | 119            | 120           |
-   | Íker    | 105         | 103            | 103           |
-   | Joaquín | 92          | 91             | 92            |
-
-Found and fixed: asetrate takes an absolute rate, so the 24 kHz speech Kokoro and OpenAI send
-would have played almost twice as fast. The chain now resamples to 44.1 kHz first.
+- **The first version moved each base voice toward an evenly spaced ladder** (245 down to
+  92 Hz), with three changes:
+  - rubberband pitch shifts with the formants held;
+  - asetrate formant moves of up to 6%;
+  - bass and treble shelves.
+- **Fixed offsets drifted, so every line was measured and corrected.** ElevenLabs reads each
+  line differently, so the engine measured every line with a YIN pitch tracker and corrected it.
+- **The ladder landed on its targets within a few Hz on two different sentences, but the voices
+  sounded robotic and unnatural** to the person who asked for them. That held even where the
+  pitch hardly moved: resynthesis leaves a metallic, phasey sound that measurements did not
+  catch.
+- **Voices that are new and still natural need a generative model, not effects.** Examples are
+  ElevenLabs Voice Design, or native Spanish voices from its library. Both need a paid plan for
+  ten voices; the free plan allows three custom voices.
+- **The pitch tracker, the processing chain and the rubberband check were removed.**
 
 Limits:
 
-- **No one has listened to them yet.** The checks are measurements (pitch, formants,
-  harmonics-to-noise, length), not ears. Moves of 3 to 4 semitones on the lowest voices may
-  sound processed.
-- **The engine's YIN tracker reads gravelly low voices higher than Praat,** by up to about 3
-  semitones (Brian 120 Hz against Praat's 105). Targets are in the engine's own reading, so the
-  ladder is consistent, but a Praat measure of the low voices comes out a little lower.
-- **On Kokoro the ends of the ladder fall short,** because there is one Spanish voice per gender
-  and moves stop at 6 semitones.
-- **Studio voices need ffmpeg with rubberband.** Without it they refuse with a message that
-  says so.
+- **The range is narrower than the first version's:** women 159–212 Hz and men 105–163 Hz,
+  because those are the voices there are. Aurora and Brisa, and Clara and Dalia, sit close in
+  pitch and differ in voice and manner instead.
+- **These are English voices speaking Spanish;** some may carry an accent. Nobody has judged
+  them by ear yet in this form.
+- **Studio voices need `ELEVENLABS_API_KEY`;** there is no Kokoro fallback, because Kokoro has
+  one Spanish voice per gender.
 - **Speech from ElevenLabs voices follows the account's plan terms.** On the free plan that
   means attribution and no commercial use.

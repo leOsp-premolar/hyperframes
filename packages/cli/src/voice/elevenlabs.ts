@@ -98,7 +98,19 @@ export const elevenlabs: VoiceProvider = {
       `${apiBase(ctx)}/v1/text-to-speech/${encodeURIComponent(request.voice)}/with-timestamps` +
       "?output_format=mp3_44100_128";
     const body: Record<string, unknown> = { text: request.text, model_id: request.model };
-    if (speed !== 1) body["voice_settings"] = { speed };
+    const tuning = request.tuning;
+    const settings = {
+      ...(tuning
+        ? {
+            stability: tuning.stability,
+            similarity_boost: tuning.similarity,
+            style: tuning.style,
+            use_speaker_boost: tuning.speakerBoost,
+          }
+        : {}),
+      ...(speed !== 1 ? { speed } : {}),
+    };
+    if (Object.keys(settings).length) body["voice_settings"] = settings;
     const response = await providerFetch(
       "elevenlabs",
       LABEL,

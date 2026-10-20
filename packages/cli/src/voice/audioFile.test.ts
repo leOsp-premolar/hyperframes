@@ -5,7 +5,6 @@ import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { findFFmpeg } from "../browser/ffmpeg.js";
 import { writeSpeechFile } from "./audioFile.js";
-import { STUDIO_VOICES, presetFilters } from "./studioVoices.js";
 
 const ffmpeg = findFFmpeg();
 
@@ -58,17 +57,6 @@ describe.skipIf(!ffmpeg)("writeSpeechFile", () => {
     const seconds = await writeSpeechFile(mp3, out, { tempo: 1, signal: signal() });
     expect(seconds).toBeGreaterThan(0.9);
     expect(existsSync(out)).toBe(true);
-  });
-
-  // The source is 24 kHz, like Kokoro and OpenAI speech.
-  it("applies a voice's filters without changing its length", async () => {
-    const out = join(dir, "shifted.wav");
-    const aurora = STUDIO_VOICES.find((p) => p.id === "aurora");
-    if (!aurora) throw new Error("no aurora preset");
-    const filters = presetFilters(aurora, 2.5);
-    const seconds = await writeSpeechFile(mp3, out, { tempo: 1, filters, signal: signal() });
-    expect(seconds).toBeGreaterThan(0.9);
-    expect(seconds).toBeLessThan(1.15);
   });
 
   it("refuses other formats", async () => {

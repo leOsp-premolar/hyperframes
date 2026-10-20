@@ -53,7 +53,7 @@ function deps(env: VoiceEnv = {}, overrides: Partial<VoiceDeps> = {}) {
   const open = fakeProvider("openai");
   const local = fakeProvider("kokoro");
   const presets = fakeProvider("studio", { configured: () => true });
-  const writes: { outputPath: string; tempo: number; filters?: string }[] = [];
+  const writes: { outputPath: string; tempo: number }[] = [];
   const d: VoiceDeps = {
     env,
     fetch: globalThis.fetch,
@@ -64,7 +64,7 @@ function deps(env: VoiceEnv = {}, overrides: Partial<VoiceDeps> = {}) {
       studio: presets.provider,
     },
     writeSpeech: async (_audio, outputPath, options) => {
-      writes.push({ outputPath, tempo: options.tempo, filters: options.filters });
+      writes.push({ outputPath, tempo: options.tempo });
       return 2;
     },
     transcribeWords: async () => [{ text: "hola", start: 0.1, end: 0.4 }],
@@ -132,20 +132,6 @@ describe("synthesizeSpeechWith", () => {
     expect(writes[0]?.tempo).toBe(0.5);
     expect(result.words).toEqual([{ text: "Hola", start: 1, end: 2 }]);
     expect(result.wordsSource).toBe("provider");
-  });
-
-  it("hands the provider's own filters to the encoder after the tempo", async () => {
-    const { d, writes } = deps();
-    d.providers.studio.synthesize = async () => ({
-      audio: new Uint8Array([1]),
-      appliedSpeed: 1,
-      styleApplied: false,
-      filters: "rubberband=pitch=1.1",
-    });
-    await synthesizeSpeechWith(d, { ...base, provider: "studio", voice: "aurora", speed: 0.8 });
-    expect(writes).toEqual([
-      { outputPath: "/tmp/hf-voice-test/line.wav", tempo: 0.8, filters: "rubberband=pitch=1.1" },
-    ]);
   });
 
   it("transcribes the written file when the provider has no word timings", async () => {

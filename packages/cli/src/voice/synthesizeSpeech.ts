@@ -257,7 +257,6 @@ export async function synthesizeSpeechWith(
     const tempo = valid.speed / speech.appliedSpeed;
     const durationSeconds = await deps.writeSpeech(speech.audio, valid.outputPath, {
       tempo,
-      filters: speech.filters,
       signal,
     });
     return { speech, tempo, durationSeconds };

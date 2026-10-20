@@ -63,6 +63,17 @@ export interface ProviderContext {
   signal: AbortSignal;
 }
 
+/** ElevenLabs delivery settings, each 0–1. They change how a voice performs, not its sound. */
+export interface VoiceTuning {
+  /** Lower is more expressive and varied, higher is steadier. */
+  stability: number;
+  /** How closely the speech keeps to the original voice. */
+  similarity: number;
+  /** How much of the voice's own manner is exaggerated. */
+  style: number;
+  speakerBoost: boolean;
+}
+
 export interface ProviderSpeechRequest {
   text: string;
   voice: string;
@@ -70,6 +81,8 @@ export interface ProviderSpeechRequest {
   speed: number;
   style?: string;
   language?: string;
+  /** Delivery settings, for providers that take them (ElevenLabs). */
+  tuning?: VoiceTuning;
 }
 
 export interface ProviderSpeech {
@@ -80,8 +93,6 @@ export interface ProviderSpeech {
   styleApplied: boolean;
   /** Seconds into `audio`, before any tempo change. */
   words?: SpeechWord[];
-  /** ffmpeg audio filters applied after the tempo change; they must keep the length. */
-  filters?: string;
 }
 
 export interface VoiceProvider {
