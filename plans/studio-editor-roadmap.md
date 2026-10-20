@@ -6,16 +6,16 @@ previous one's tests.
 
 ## Stages
 
-| Stage | Branch                         | State  | Scope                                                                    |
-| ----- | ------------------------------ | ------ | ------------------------------------------------------------------------ |
-| S0    | `studio/s0-e2e-workflow`       | Done   | Browser gate: import, place, split, trim, undo/redo, reload, export      |
-| S4    | `studio/s4-create-project`     | Done   | New project from the header or the empty start screen; `POST /projects`  |
-| S2    | `studio/s2-media-metadata`     | Done   | Media metadata on asset cards; upload validation                         |
-| S3    | `studio/s3-missing-media`      | Review | Missing media detection and replacement                                  |
-| S1    | `studio/s1-export-options`     | Review | Export the in/out range; audio-only export; GIF and PNG sequence options |
-| S5    | `studio/s5-slip-roll`          | Review | Slip and roll editing                                                    |
-| S6    | `studio/s6-track-lock-solo`    | Review | Track lock and solo                                                      |
-| S7    | `studio/s7-keyframes-playback` | Review | Browser verification of keyframes and playback                           |
+| Stage | Branch                         | State | Scope                                                                    |
+| ----- | ------------------------------ | ----- | ------------------------------------------------------------------------ |
+| S0    | `studio/s0-e2e-workflow`       | Done  | Browser gate: import, place, split, trim, undo/redo, reload, export      |
+| S4    | `studio/s4-create-project`     | Done  | New project from the header or the empty start screen; `POST /projects`  |
+| S2    | `studio/s2-media-metadata`     | Done  | Media metadata on asset cards; upload validation                         |
+| S3    | `studio/s3-missing-media`      | Done  | Missing media detection and replacement                                  |
+| S1    | `studio/s1-export-options`     | Done  | Export the in/out range; audio-only export; GIF and PNG sequence options |
+| S5    | `studio/s5-slip-roll`          | Done  | Slip and roll editing                                                    |
+| S6    | `studio/s6-track-lock-solo`    | Done  | Track lock and solo                                                      |
+| S7    | `studio/s7-keyframes-playback` | Done  | Browser verification of keyframes and playback                           |
 
 ## Known limitations to plan for
 
