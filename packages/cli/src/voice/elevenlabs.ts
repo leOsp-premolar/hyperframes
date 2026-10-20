@@ -12,8 +12,9 @@ import {
 const LABEL = "ElevenLabs";
 const KEY = "ELEVENLABS_API_KEY";
 const DEFAULT_BASE = "https://api.elevenlabs.io";
-// Rachel: the voice the media-use skill defaults to, so both paths sound alike.
-const DEFAULT_VOICE = "21m00Tcm4TlvDq8ikWAM";
+// Sarah, one of the voices every account gets. Rachel, the media-use skill's default, is a
+// library voice: the API answers 402 for it on a free plan.
+const DEFAULT_VOICE = "EXAVITQu4vr4xnSDxMaL";
 // voice_settings.speed accepts this range; slower or faster is done with atempo.
 const NATIVE_SPEED: readonly [number, number] = [0.7, 1.2];
 

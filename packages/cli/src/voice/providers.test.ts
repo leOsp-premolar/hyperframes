@@ -157,6 +157,12 @@ describe("ElevenLabs", () => {
     ).rejects.toBe(reason);
   });
 
+  // A library voice (Rachel, the old default) answers 402 on a free plan; Sarah ships with every
+  // account.
+  it("defaults to a voice a free account can use", () => {
+    expect(elevenlabs.defaultVoice()).toBe("EXAVITQu4vr4xnSDxMaL");
+  });
+
   it("lists the account's voices", async () => {
     const { fetchFn, calls } = fakeFetch(() =>
       json({

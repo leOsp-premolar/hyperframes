@@ -25,7 +25,7 @@ const PROVIDERS = {
       local: false,
       configured: false,
       setupHint: "Set ELEVENLABS_API_KEY (elevenlabs.io → Profile → API keys).",
-      defaultVoice: "21m00Tcm4TlvDq8ikWAM",
+      defaultVoice: "EXAVITQu4vr4xnSDxMaL",
       defaultModel: "eleven_multilingual_v2",
       models: ["eleven_multilingual_v2"],
       styleModels: [],
