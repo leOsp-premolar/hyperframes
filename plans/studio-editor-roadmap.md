@@ -333,8 +333,11 @@ Limits:
 - **The range is narrower than the first version's:** women 159–212 Hz and men 105–163 Hz,
   because those are the voices there are. Aurora and Brisa, and Clara and Dalia, sit close in
   pitch and differ in voice and manner instead.
-- **These are English voices speaking Spanish;** some may carry an accent. Nobody has judged
-  them by ear yet in this form.
+- **These are English voices speaking Spanish;** some may carry an accent. The person who asked
+  for them listened to each one saying a short Spanish line and approved the set.
+- **The order holds by register, not by every neighbour on every take.** ElevenLabs reads each
+  line a little differently, so on a three-second line voices a few hertz apart can swap places
+  (Dalia above Brisa, Íker below Joaquín); women stay above men.
 - **Studio voices need `ELEVENLABS_API_KEY`;** there is no Kokoro fallback, because Kokoro has
   one Spanish voice per gender.
 - **Speech from ElevenLabs voices follows the account's plan terms.** On the free plan that
