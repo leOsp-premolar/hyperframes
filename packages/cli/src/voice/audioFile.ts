@@ -14,12 +14,6 @@ const CODEC_ARGS: Record<string, string[]> = {
   ".mp3": ["-c:a", "libmp3lame", "-b:a", "192k", "-f", "mp3"],
 };
 
-/**
- * Writes provider audio to `outputPath` as 44.1 kHz mono in the extension's format, changing its
- * tempo by `tempo` (0.5–2, pitch kept), and returns its length in seconds. The file appears whole
- * or not at all: ffmpeg writes beside it under a name no media list shows, and the result is
- * renamed into place, so a project watcher never lists half a file.
- */
 const rubberbandByBinary = new Map<string, boolean>();
 
 /** Studio voices need ffmpeg built with librubberband; some minimal builds leave it out. */
@@ -33,6 +27,13 @@ function hasRubberband(ffmpeg: string): boolean {
   return known;
 }
 
+/**
+ * Writes provider audio to `outputPath` as 44.1 kHz mono in the extension's format, changing its
+ * tempo by `tempo` (0.5–2, pitch kept) and then applying a voice's `filters`, and returns its
+ * length in seconds. The file appears whole or not at all: ffmpeg writes beside it under a name
+ * no media list shows, and the result is renamed into place, so a project watcher never lists
+ * half a file.
+ */
 export async function writeSpeechFile(
   audio: Uint8Array,
   outputPath: string,
