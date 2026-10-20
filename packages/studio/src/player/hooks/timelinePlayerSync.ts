@@ -11,7 +11,11 @@ const RENDERED_FIELDS: readonly (keyof TimelineElement)[] = [
   "hasAudio",
   "volume",
   "playbackRate",
+  // The in-point: a slip, or the undo of one, changes nothing else.
+  "playbackStart",
   "hidden",
+  // A track lock, or the undo of one, changes nothing else either.
+  "timelineLocked",
   "audioGroup",
   "audioGroupVolume",
   "audioGroupHidden",

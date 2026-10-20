@@ -68,17 +68,37 @@ export interface MediaColorMetadata {
   bitsPerRawSample?: string;
 }
 
+export interface MediaAudioMetadata {
+  codecName?: string;
+  sampleRate?: number;
+  channels?: number;
+}
+
 export interface MediaMetadata {
   kind: "video" | "image" | "audio" | "unknown";
   color: MediaColorMetadata;
   /** Video audio stream, when probed. Absent means the drop path stays muted. */
   hasAudio?: boolean;
+  /** Picture size of a video or image. */
+  width?: number;
+  height?: number;
+  /** Frames per second of a video, from its average frame rate. */
+  frameRate?: number;
+  durationSeconds?: number;
+  /** The first audio stream: a video's soundtrack, or an audio file's own. */
+  audio?: MediaAudioMetadata;
   probeError?: string;
 }
 
 interface FfprobeStream {
   codec_type?: string;
   codec_name?: string;
+  width?: number;
+  height?: number;
+  avg_frame_rate?: string;
+  r_frame_rate?: string;
+  sample_rate?: string;
+  channels?: number;
   profile?: string;
   pix_fmt?: string;
   color_space?: string;
@@ -198,6 +218,65 @@ export async function probeFirstFrameColour(
   return result.status === 0 ? parseFirstFrameColour(String(result.stderr)) : {};
 }
 
+const PROBE_ENTRIES =
+  "stream=codec_type,codec_name,profile,pix_fmt,color_space,color_transfer,color_primaries,bits_per_raw_sample,width,height,avg_frame_rate,r_frame_rate,sample_rate,channels:stream_disposition=attached_pic:format=duration";
+
+type ProbeOutcome = { streams: FfprobeStream[]; durationSeconds?: number } | { probeError: string };
+
+function ffprobeFor(runner: FfprobeRunner): string | undefined {
+  return (
+    findFfBinary("ffprobe", { configuredMustExist: true }) ??
+    (runner === execFileRunner ? undefined : "ffprobe")
+  );
+}
+
+async function runProbe(filePath: string, runner: FfprobeRunner): Promise<ProbeOutcome> {
+  const ffprobePath = ffprobeFor(runner);
+  if (!ffprobePath) return { probeError: "ffprobe unavailable" };
+
+  const result = await runner(
+    ffprobePath,
+    ["-v", "error", "-show_entries", PROBE_ENTRIES, "-of", "json", "--", filePath],
+    { timeout: 15_000, maxBuffer: 1024 * 1024 },
+  );
+  if (result.error?.code === "ENOENT") return { probeError: "ffprobe unavailable" };
+  if (result.status !== 0) return { probeError: "ffprobe failed" };
+  return parseProbeOutput(result.stdout);
+}
+
+function parseProbeOutput(stdout: string | Buffer): ProbeOutcome {
+  try {
+    const parsed = JSON.parse(String(stdout || "{}")) as {
+      streams?: FfprobeStream[];
+      format?: { duration?: string };
+    };
+    return { streams: parsed.streams ?? [], durationSeconds: positive(parsed.format?.duration) };
+  } catch {
+    return { probeError: "ffprobe returned invalid json" };
+  }
+}
+
+function positive(value: string | number | undefined): number | undefined {
+  const n = Number(value);
+  return Number.isFinite(n) && n > 0 ? n : undefined;
+}
+
+/** "30000/1001" → 29.97; "0/0" and missing rates → undefined. */
+export function parseFrameRate(rate: string | undefined): number | undefined {
+  const [num = Number.NaN, den = 1] = (rate ?? "").split("/").map(Number);
+  const fps = num / den;
+  return Number.isFinite(fps) && fps > 0 ? Math.round(fps * 1000) / 1000 : undefined;
+}
+
+function audioOf(stream: FfprobeStream | undefined): MediaAudioMetadata | undefined {
+  if (!stream) return undefined;
+  return {
+    codecName: stream.codec_name,
+    sampleRate: positive(stream.sample_rate),
+    channels: positive(stream.channels),
+  };
+}
+
 export async function probeMediaMetadata(
   filePath: string,
   runner: FfprobeRunner = execFileRunner,
@@ -207,49 +286,51 @@ export async function probeMediaMetadata(
     return { kind, color: classifyMediaColor(null) };
   }
 
-  // The default runner degrades a missing ffprobe to "unavailable" without
-  // spawning; injected runners own execution and receive the normal command.
-  const ffprobePath =
-    findFfBinary("ffprobe", { configuredMustExist: true }) ??
-    (runner === execFileRunner ? undefined : "ffprobe");
-  if (!ffprobePath) {
-    return { kind, color: classifyMediaColor(null), probeError: "ffprobe unavailable" };
+  const probe = await runProbe(filePath, runner);
+  if ("probeError" in probe) {
+    return { kind, color: classifyMediaColor(null), probeError: probe.probeError };
   }
 
-  const result = await runner(
-    ffprobePath,
-    [
-      "-v",
-      "error",
-      "-show_entries",
-      "stream=codec_type,codec_name,profile,pix_fmt,color_space,color_transfer,color_primaries,bits_per_raw_sample:stream_disposition=attached_pic",
-      "-of",
-      "json",
-      "--",
-      filePath,
-    ],
-    { timeout: 15_000, maxBuffer: 1024 * 1024 },
-  );
+  const stream = probe.streams.find((item) => {
+    if (kind === "image") return item.codec_type === "video";
+    return item.codec_type === kind && item.disposition?.attached_pic !== 1;
+  });
+  const metadata: MediaMetadata = {
+    kind,
+    color: classifyMediaColor(stream),
+    width: positive(stream?.width),
+    height: positive(stream?.height),
+  };
+  if (kind === "video") {
+    const audio = probe.streams.find((item) => item.codec_type === "audio");
+    metadata.hasAudio = audio !== undefined;
+    metadata.frameRate =
+      parseFrameRate(stream?.avg_frame_rate) ?? parseFrameRate(stream?.r_frame_rate);
+    metadata.durationSeconds = probe.durationSeconds;
+    metadata.audio = audioOf(audio);
+  }
+  return metadata;
+}
 
-  if (result.error?.code === "ENOENT") {
-    return { kind, color: classifyMediaColor(null), probeError: "ffprobe unavailable" };
+/**
+ * Everything the Assets panel shows about a file. Unlike `probeMediaMetadata`, which bulk
+ * scans call and which skips audio files, this also probes audio for its codec and length.
+ */
+export async function probeMediaDetails(
+  filePath: string,
+  runner: FfprobeRunner = execFileRunner,
+): Promise<MediaMetadata> {
+  if (inferKindFromPath(filePath) !== "audio") return probeMediaMetadata(filePath, runner);
+  const probe = await runProbe(filePath, runner);
+  if ("probeError" in probe) {
+    return { kind: "audio", color: classifyMediaColor(null), probeError: probe.probeError };
   }
-  if (result.status !== 0) {
-    return { kind, color: classifyMediaColor(null), probeError: "ffprobe failed" };
-  }
-
-  try {
-    const parsed = JSON.parse(String(result.stdout || "{}")) as { streams?: FfprobeStream[] };
-    const stream = parsed.streams?.find((item) => {
-      if (kind === "image") return item.codec_type === "video";
-      return item.codec_type === kind && item.disposition?.attached_pic !== 1;
-    });
-    const metadata: MediaMetadata = { kind, color: classifyMediaColor(stream) };
-    if (kind === "video") {
-      metadata.hasAudio = (parsed.streams ?? []).some((item) => item.codec_type === "audio");
-    }
-    return metadata;
-  } catch {
-    return { kind, color: classifyMediaColor(null), probeError: "ffprobe returned invalid json" };
-  }
+  const audio = probe.streams.find((item) => item.codec_type === "audio");
+  return {
+    kind: "audio",
+    color: classifyMediaColor(null),
+    hasAudio: audio !== undefined,
+    durationSeconds: probe.durationSeconds,
+    audio: audioOf(audio),
+  };
 }

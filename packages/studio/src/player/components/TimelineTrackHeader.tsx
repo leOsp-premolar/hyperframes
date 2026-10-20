@@ -1,4 +1,5 @@
 import type { GsapAnimation } from "@hyperframes/core/gsap-parser";
+import { TrackLockSoloButtons } from "./TrackLockSoloButtons";
 import {
   HF_AUDIO_FX_ATTR,
   serializeAudioFxChain,
@@ -319,6 +320,11 @@ export function TimelineTrackHeader({
               // On the control line rather than a third row of its own.
               trailing={
                 <>
+                  <TrackLockSoloButtons
+                    trackNumber={trackNumber}
+                    trackDisplayNumber={trackDisplayNumber}
+                    trackElements={trackElements}
+                  />
                   {showAudioEffects && singleAudioClip && (
                     <TimelineFxButton
                       variant="chain"
@@ -388,6 +394,11 @@ export function TimelineTrackHeader({
               trackDisplayNumber={trackDisplayNumber}
               asMute={isAudioOnly}
               onToggle={onToggleTrackHidden}
+            />
+            <TrackLockSoloButtons
+              trackNumber={trackNumber}
+              trackDisplayNumber={trackDisplayNumber}
+              trackElements={trackElements}
             />
           </LayerDisclosureRow>
         </>

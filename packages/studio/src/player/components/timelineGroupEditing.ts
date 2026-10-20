@@ -189,6 +189,11 @@ export interface TimelineGroupResizeChange {
   start: number;
   duration: number;
   playbackStart?: number;
+  /**
+   * False: show `playbackStart` but save without it, so the save derives the in-point from the
+   * file and the start shift (a roll), never from a value the timeline may not have re-read yet.
+   */
+  persistPlaybackStart?: boolean;
 }
 
 function elementKey(element: TimelineElement): string {
@@ -274,6 +279,8 @@ export function resolveTimelineGroupResizeChanges(
 
 /** In-flight multi-select group-resize gesture (owned by the drag hook). */
 export interface TimelineGroupResizeSession {
+  /** The undo entry's name, when the gesture is not a plain resize. */
+  label?: string;
   grabbedKey: string;
   edge: TimelineGroupResizeEdge;
   members: TimelineGroupResizeMember[];

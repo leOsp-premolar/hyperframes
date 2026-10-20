@@ -24,6 +24,7 @@ import {
   previewGroupResize,
   type ResizePreviewResult,
 } from "./timelineClipDragPreview";
+import { applySlipRollPointer } from "./timelineSlipRoll";
 import type {
   DraggedClipState,
   ResizingClipState,
@@ -340,6 +341,20 @@ export function useTimelineClipDrag({
   // stationary pointer). computeResizePreview is pure; here we only apply state.
   const applyResizePointer = useCallback(
     (resize: ResizingClipState, clientX: number) => {
+      if (resize.mode) {
+        const context = {
+          scroll: scrollRef.current,
+          pps: ppsRef.current,
+          elements: elementsRef.current,
+        };
+        return applySlipRollPointer({ ...resize, mode: resize.mode }, clientX, context, {
+          setSession: (session) => (groupResizeRef.current = session),
+          showFrame: setPreviewFrame,
+          publish: (preview) =>
+            resizingClipRef.current &&
+            publishResizingClip({ ...resizingClipRef.current, started: true, ...preview }),
+        });
+      }
       const next = computeResizePreview(resize, clientX, {
         scroll: scrollRef.current,
         pps: ppsRef.current,

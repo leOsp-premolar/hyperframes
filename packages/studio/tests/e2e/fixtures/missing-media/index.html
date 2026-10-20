@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=640, height=360" />
+    <style>
+      html,
+      body {
+        margin: 0;
+        width: 640px;
+        height: 360px;
+        overflow: hidden;
+        background: #000;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- Both media files are absent on purpose: the missing-media gate replaces them. -->
+    <div
+      id="root"
+      data-composition-id="main"
+      data-start="0"
+      data-duration="3"
+      data-width="640"
+      data-height="360"
+      data-no-timeline
+    >
+      <video
+        id="hero"
+        class="clip"
+        src="assets/hero.mov"
+        data-start="0"
+        data-duration="3"
+        data-media-start="0.5"
+        data-track-index="0"
+        data-has-audio="true"
+        style="position: absolute; inset: 0; width: 640px; height: 360px"
+      ></video>
+      <img
+        id="logo"
+        class="clip"
+        src="assets/logo.png"
+        data-start="0"
+        data-duration="3"
+        data-track-index="1"
+        style="position: absolute; left: 20px; top: 20px; width: 100px; height: 50px"
+      />
+    </div>
+  </body>
+</html>

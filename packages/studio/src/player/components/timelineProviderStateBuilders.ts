@@ -68,6 +68,12 @@ export interface TimelineMetaBuilderInputs {
   razorGuide: TimelineMeta["razorGuide"];
 }
 
+const TOOL_CURSOR: Partial<Record<string, string>> = {
+  razor: "cursor-crosshair",
+  slip: "cursor-ew-resize",
+  roll: "cursor-col-resize",
+};
+
 export function buildTimelineMeta({
   emptyState,
   container,
@@ -77,7 +83,7 @@ export function buildTimelineMeta({
   razorGuide,
 }: TimelineMetaBuilderInputs): TimelineMeta {
   const { labelMode, zoomMode, contentOrigin, ...viewportProps } = viewport;
-  const containerClassName = `relative border-t select-none h-full overflow-hidden ${container.isDragOver ? container.accentClass : ""} ${container.activeTool === "razor" ? "cursor-crosshair" : container.shiftHeld ? "cursor-crosshair" : "cursor-default"}`;
+  const containerClassName = `relative border-t select-none h-full overflow-hidden ${container.isDragOver ? container.accentClass : ""} ${TOOL_CURSOR[container.activeTool] ?? (container.shiftHeld ? "cursor-crosshair" : "cursor-default")}`;
   const viewportClassName = `${zoomMode === "fit" ? "overflow-x-hidden" : "overflow-x-auto"} overflow-y-auto h-full outline-hidden`;
   return {
     emptyState,

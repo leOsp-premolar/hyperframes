@@ -105,6 +105,8 @@
     "registry/**",
     // Browser fixture HTML loads generated player bundles that exist only after the package build.
     "packages/core/src/runtime/fixtures/deck-audio-demo.html",
+    // Loads GSAP from assets/ that the keyframes-playback browser test copies in at run time.
+    "packages/studio/tests/e2e/fixtures/keyframes-playback/index.html",
     // Browser test intentionally contains repeated inline scenarios for distinct failure paths.
     "examples/**",
     "packages/sdk/examples/**",

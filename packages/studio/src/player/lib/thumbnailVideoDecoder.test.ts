@@ -8,6 +8,7 @@ const canvasesAtTimestamps = vi.fn();
 const getKeyPacket = vi.fn(async (_time: number) => null as { timestamp: number } | null);
 const input = {
   getPrimaryVideoTrack: vi.fn(),
+  getFormat: vi.fn(async (): Promise<unknown> => "mp4"),
   dispose,
 };
 
@@ -18,6 +19,7 @@ vi.mock("mediabunny", () => ({
   },
   Input: class {
     getPrimaryVideoTrack = input.getPrimaryVideoTrack;
+    getFormat = input.getFormat;
     dispose = input.dispose;
   },
   CanvasSink: class {
@@ -49,6 +51,10 @@ beforeEach(() => {
   source = `/clip-${++sources}.mp4`;
   vi.clearAllMocks();
   getKeyPacket.mockImplementation(async () => null);
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async () => new Response("x", { status: 206 })),
+  );
   vi.spyOn(URL, "createObjectURL")
     .mockReturnValueOnce("blob:one")
     .mockReturnValueOnce("blob:two")
@@ -83,6 +89,29 @@ describe("videoThumbnailTimestamps", () => {
 });
 
 describe("decodeVideoThumbnail", () => {
+  it("turns away a source that is not there before Mediabunny opens it", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response("gone", { status: 404 })),
+    );
+    await expect(
+      decodeVideoThumbnail({ source, frameCount: 1 }, new AbortController().signal),
+    ).rejects.toThrow("Video source cannot be read");
+    expect(input.getPrimaryVideoTrack).not.toHaveBeenCalled();
+    expect(dispose).not.toHaveBeenCalled();
+  });
+
+  it("leaves a file that cannot be opened undisposed, so no rejection goes unhandled", async () => {
+    const unreadable = new Error("Input has an unsupported or unrecognizable format.");
+    input.getPrimaryVideoTrack.mockRejectedValueOnce(unreadable);
+    input.getFormat.mockRejectedValueOnce(unreadable);
+    await expect(
+      decodeVideoThumbnail({ source, frameCount: 1 }, new AbortController().signal),
+    ).rejects.toThrow("unsupported");
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(dispose).not.toHaveBeenCalled();
+  });
+
   it("extracts sparse frames, returns object URLs, and disposes once", async () => {
     const decoded: number[][] = [];
     recordDecodes(decoded);

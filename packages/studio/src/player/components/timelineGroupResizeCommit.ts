@@ -35,15 +35,14 @@ export function commitTimelineGroupResize(
     );
     return;
   }
+  const persisted = changes.map((change) => ({
+    element: change.element,
+    start: change.start,
+    duration: change.duration,
+    playbackStart: change.persistPlaybackStart === false ? undefined : change.playbackStart,
+  }));
   Promise.resolve(
-    persist(
-      changes.map((change) => ({
-        element: change.element,
-        start: change.start,
-        duration: change.duration,
-        playbackStart: change.playbackStart,
-      })),
-    ),
+    session.label ? persist(persisted, { label: session.label }) : persist(persisted),
   ).catch((error) => {
     rollbackLatestTimelineOptimisticGesture(
       updateElement,

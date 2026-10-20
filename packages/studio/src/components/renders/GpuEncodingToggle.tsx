@@ -1,10 +1,12 @@
+import type { ExportFormat } from "./exportFormats";
+
 export function GpuEncodingToggle({
   format,
   checked,
   disabled,
   onToggle,
 }: {
-  format: "mp4" | "webm" | "mov";
+  format: ExportFormat;
   checked: boolean;
   disabled: boolean;
   onToggle: () => void;

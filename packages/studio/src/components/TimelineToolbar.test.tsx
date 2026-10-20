@@ -416,17 +416,24 @@ describe("TimelineToolbar tool menu", () => {
     return rows;
   }
 
-  it("lists Select, Split, Select leftward and Select rightward by default", async () => {
+  it("lists the tools, then Select leftward and Select rightward by default", async () => {
     expect(await openMenuRows({})).toEqual([
       "Select",
       "Split",
+      "Slip",
+      "Roll",
       "Select leftward",
       "Select rightward",
     ]);
   });
 
-  it("lists only Select and Split when the host hides select around the playhead", async () => {
-    expect(await openMenuRows({ showSelectAroundPlayhead: false })).toEqual(["Select", "Split"]);
+  it("lists only the tools when the host hides select around the playhead", async () => {
+    expect(await openMenuRows({ showSelectAroundPlayhead: false })).toEqual([
+      "Select",
+      "Split",
+      "Slip",
+      "Roll",
+    ]);
   });
 
   it.each([true, false])("[ and ] select around the playhead with the rows shown: %s", (shown) => {

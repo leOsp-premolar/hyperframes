@@ -13,6 +13,7 @@ import { useAssetPreviewStore } from "../../utils/assetPreviewStore";
 import { findClipForAsset, isPointerClick } from "../../utils/assetClickBehavior";
 import { basename, ext, truncateMiddle, formatDuration, type CopyFeedback } from "./assetHelpers";
 import { resolveMediaPreviewUrl } from "../../player/components/thumbnailUtils";
+import { AssetMediaFacts } from "./AssetMediaFacts";
 
 /** Drag payload writer shared by the asset tile and the font row: copy effect
  *  plus the timeline-asset MIME and a plain-text path fallback. */
@@ -209,6 +210,7 @@ export function AssetCard({
         draggable
         role="button"
         tabIndex={0}
+        data-asset-path={asset}
         aria-label={`${name}: open, drag to timeline, right-click for actions`}
         onPointerDown={handlePointerDown}
         onPointerUp={handlePointerUp}
@@ -286,6 +288,9 @@ export function AssetCard({
           </span>
           <CopyChip feedback={copyFeedback} asset={asset} />
         </div>
+        {(isVideo || isImage) && (
+          <AssetMediaFacts projectId={projectId} asset={asset} className="justify-center" />
+        )}
       </div>
 
       {contextMenu && (

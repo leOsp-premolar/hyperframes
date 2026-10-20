@@ -1,4 +1,6 @@
 import { buildProjectApiPath } from "../../utils/projectRouting";
+import { getPersistedRenderSettings } from "./renderSettings";
+import { EXPORT_EXT, type ExportFormat, type ExportRange } from "./exportFormats";
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import type { CanvasResolution } from "@hyperframes/parsers";
 import { trackStudioRenderStart } from "../../telemetry/events";
@@ -29,7 +31,9 @@ export type ResolutionPreset = CanvasResolution;
 export interface StartRenderOptions {
   fps?: number;
   quality?: "draft" | "standard" | "high";
-  format?: "mp4" | "webm" | "mov";
+  format?: ExportFormat;
+  /** The timeline's in/out range in seconds; omit for the whole timeline. */
+  range?: ExportRange;
   /** `"auto"` (default) renders at the composition's authored dimensions. */
   resolution?: ResolutionPreset | "auto";
   gpu?: boolean;
@@ -194,9 +198,12 @@ export function useRenderQueue(
         return;
       }
 
-      const fps = opts.fps ?? 30;
-      const quality = opts.quality ?? "standard";
-      const format = opts.format ?? "mp4";
+      // A control that names no settings (the header's Export) exports with
+      // the ones last chosen in the Renders panel.
+      const saved = getPersistedRenderSettings();
+      const fps = opts.fps ?? saved.fps;
+      const quality = opts.quality ?? saved.quality;
+      const format = opts.format ?? saved.format;
       const resolution = opts.resolution;
       // Which composition a render targets belongs here, with the same
       // argument the FFmpeg gate above makes: Studio starts renders from three
@@ -236,6 +243,7 @@ export function useRenderQueue(
         composition?: string;
         variables?: Record<string, unknown>;
         gpu?: boolean;
+        range?: ExportRange;
         telemetryDistinctId?: string;
         telemetryOptOut?: boolean;
       } = {
@@ -260,7 +268,8 @@ export function useRenderQueue(
       }
       if (resolution && resolution !== "auto") body.resolution = resolution;
       if (composition) body.composition = composition;
-      if (opts.gpu) body.gpu = true;
+      if (opts.gpu ?? saved.gpu) body.gpu = true;
+      if (opts.range) body.range = opts.range;
       if (opts.variables && Object.keys(opts.variables).length > 0) {
         body.variables = opts.variables;
       }
@@ -304,8 +313,7 @@ export function useRenderQueue(
       }
       const { jobId } = await res.json();
 
-      const FORMAT_EXT: Record<string, string> = { mp4: ".mp4", webm: ".webm", mov: ".mov" };
-      const ext = FORMAT_EXT[format] ?? ".mp4";
+      const ext = EXPORT_EXT[format];
       const job: RenderJob = {
         id: jobId,
         status: "rendering",

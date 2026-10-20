@@ -8,6 +8,7 @@ import { readElementPlaybackRate, readElementRateSpec, readMediaStart } from "./
 import { rateAt, sourceTimeAt, timeAtSourceTime, type RateSpec } from "../speedRamp.js";
 import { clampAudioGain } from "../audioGain.js";
 import { isMemberGroupHidden } from "../audioGroups.js";
+import { isSoloSilenced } from "../studioPreviewMark.js";
 import { findInjectedRenderFrame } from "./renderFrameSibling.js";
 import { registerSeekCompletion } from "./adapters/seek-dispatch.js";
 import { cutToHostSlots, type HostSlot } from "../mediaTiming.js";
@@ -515,8 +516,11 @@ export function syncRuntimeMedia(params: {
       // muted BUS is invisible to `closest()`. The render drops such members
       // (`memberGroupHidden`), so without this the export was silent where the
       // fallback played at full level.
+      // Studio's track solo silences the rest in the preview only (never in the render).
       const silencedByHidden =
-        el.closest("[data-hidden]") !== null || isMemberGroupHidden(el.ownerDocument, el);
+        el.closest("[data-hidden]") !== null ||
+        isSoloSilenced(el) ||
+        isMemberGroupHidden(el.ownerDocument, el);
       const effectiveVolume = silencedByHidden ? 0 : clampVolume(authorVolume * userVol);
       el.volume = effectiveVolume;
       lastRuntimeAppliedVolume.set(el, effectiveVolume);

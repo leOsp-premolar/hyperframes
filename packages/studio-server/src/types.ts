@@ -106,6 +106,16 @@ export interface StudioApiAdapter {
   /** List all available projects. */
   listProjects(): Promise<ResolvedProject[]> | ResolvedProject[];
 
+  /**
+   * Create the project `id` holding `files` (paths inside the project folder). Absent when the
+   * host serves a single project. Must never reuse or replace an existing folder: it throws an
+   * error whose `code` is "EEXIST" instead, and leaves nothing behind when a write fails.
+   */
+  createProject?(
+    id: string,
+    files: Record<string, string>,
+  ): Promise<ResolvedProject> | ResolvedProject;
+
   /** Resolve a project ID (or session ID) to its directory. Returns null if not found. */
   resolveProject(id: string): Promise<ResolvedProject | null> | ResolvedProject | null;
 
@@ -161,7 +171,10 @@ export interface StudioApiAdapter {
   startRender(opts: {
     project: ResolvedProject;
     outputPath: string;
-    format: "mp4" | "webm" | "mov";
+    /** `png-sequence` writes a folder of `frame_NNNNNN.png` (plus `audio.m4a`) at `outputPath`. */
+    format: "mp4" | "webm" | "mov" | "gif" | "png-sequence";
+    /** Stop the render this many seconds in (the producer's `endSeconds`); unset renders it all. */
+    endSeconds?: number;
     /**
      * Frame rate as an exact rational. The HTTP layer (POST
      * `/projects/:id/render`) accepts either a JSON number (integer fps,

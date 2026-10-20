@@ -35,7 +35,7 @@ import type {
 
 export type { TimelineElement, SubCompositionHostState };
 export type ZoomMode = "fit" | "manual";
-type TimelineTool = "select" | "razor";
+type TimelineTool = "select" | "razor" | "slip" | "roll";
 
 export interface SelectElementOptions {
   preserveSet?: boolean;

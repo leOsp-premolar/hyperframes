@@ -1,5 +1,6 @@
 export { createStudioApi } from "./createStudioApi.js";
 export { MAX_UPLOAD_BYTES } from "./routes/files.js";
+export { renderMetaPath } from "./helpers/exportJob.js";
 export {
   createProjectSignature,
   affectsProjectSignature,

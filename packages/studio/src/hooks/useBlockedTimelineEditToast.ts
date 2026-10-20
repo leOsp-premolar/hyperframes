@@ -7,7 +7,8 @@
  */
 
 import { useCallback, useRef } from "react";
-import type { TimelineElement } from "../player";
+import { usePlayerStore, type TimelineElement } from "../player";
+import { trackLockRefusal } from "../player/components/trackLockSolo";
 
 const BLOCKED_TOAST_INTERVAL_MS = 1500;
 
@@ -16,11 +17,12 @@ export function useBlockedTimelineEditToast(
 ): (element: TimelineElement) => void {
   const lastAtRef = useRef(0);
   return useCallback(
-    (_element: TimelineElement) => {
+    (element: TimelineElement) => {
       const now = Date.now();
       if (now - lastAtRef.current < BLOCKED_TOAST_INTERVAL_MS) return;
       lastAtRef.current = now;
-      showToast("This clip can't be moved or resized from the timeline yet.", "info");
+      const locked = trackLockRefusal(element, usePlayerStore.getState().elements);
+      showToast(locked ?? "This clip can't be moved or resized from the timeline yet.", "info");
     },
     [showToast],
   );

@@ -8,6 +8,7 @@ import { useAssetPreviewStore } from "../../utils/assetPreviewStore";
 import { findClipForAsset, isPointerClick } from "../../utils/assetClickBehavior";
 import { resolveMediaPreviewUrl } from "../../player/components/thumbnailUtils";
 import { timelineClipFocusId } from "../../player/components/timelineNavigationIdentity";
+import { AssetMediaFacts } from "./AssetMediaFacts";
 
 // Only one preview should play at a time; starting a row stops the previous one.
 let stopCurrentPreview: (() => void) | null = null;
@@ -204,6 +205,7 @@ export function AudioRow({
     <>
       <div
         draggable
+        data-asset-path={asset}
         onPointerDown={handlePointerDown}
         onPointerUp={handlePointerUp}
         role="button"
@@ -290,6 +292,7 @@ export function AudioRow({
               </span>
             )}
           </div>
+          {!playing && <AssetMediaFacts projectId={projectId} asset={asset} />}
           {bars.length > 0 && (
             <div className="flex items-end gap-[2px] h-[14px] mt-0.5">
               {bars.map((v, i) => (

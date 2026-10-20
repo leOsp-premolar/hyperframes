@@ -1,9 +1,11 @@
 import { TIMELINE_VIEWPORT_BUDGETS, type TimelineViewportBudgets } from "./timelineViewportBudgets";
+import { mediaSourceReachable } from "./mediaSourceReachable";
 import {
   createThumbnailKey,
   type ThumbnailLoadedResult,
   type ThumbnailValue,
 } from "./thumbnailScheduler";
+import { disposeMediaInput } from "./disposeMediaInput";
 
 export interface VideoThumbnailDecodeRequest {
   source: string;
@@ -271,6 +273,9 @@ async function decodeMissingFrames(
   keyOf: (time: number) => string,
   resources: DecodedResources,
 ): Promise<ThumbnailLoadedResult> {
+  if (!sourceInfos.has(request.source) && !(await mediaSourceReachable(request.source, signal))) {
+    throw new Error(`Video source cannot be read: ${request.source}`);
+  }
   const mediabunny = await import("mediabunny");
   throwIfAborted(signal);
 
@@ -323,6 +328,6 @@ async function decodeMissingFrames(
     }
     return loadedResult(resources, info.aspect, budgets, timestamps.length);
   } finally {
-    input.dispose();
+    disposeMediaInput(input);
   }
 }

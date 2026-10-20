@@ -1,5 +1,5 @@
-import { memo, useContext, type MouseEvent } from "react";
-import { Camera } from "../icons/SystemIcons";
+import { memo, useContext, useState, type MouseEvent } from "react";
+import { Camera, Plus } from "../icons/SystemIcons";
 import { useStudioShellContext } from "../contexts/StudioContext";
 import { usePanelLayoutContext } from "../contexts/PanelLayoutContext";
 import { trackStudioEvent } from "../utils/studioTelemetry";
@@ -9,6 +9,9 @@ import { InspectorIcon } from "./icons/InspectorIcon";
 import { OpenInDesktopButton } from "./OpenInDesktopButton";
 import { HyperframesLogo } from "./ui/HyperframesLogo";
 import { ShowThemeToggle, ThemeToggle } from "./ThemeToggle";
+import { NewProjectDialog } from "./NewProjectDialog";
+import { IconButton } from "./ui";
+import { buildProjectHash } from "../utils/projectRouting";
 
 interface StudioHeaderProps {
   captureFrameHref: string;
@@ -19,6 +22,8 @@ interface StudioHeaderProps {
   inspectorButtonActive: boolean;
   inspectorPanelActive: boolean;
   onExport?: () => void;
+  /** Show "New project": the server can create projects. */
+  canCreateProjects?: boolean;
 }
 
 /**
@@ -45,8 +50,10 @@ export const StudioHeader = memo(function StudioHeader({
   inspectorButtonActive,
   inspectorPanelActive,
   onExport,
+  canCreateProjects = false,
 }: StudioHeaderProps) {
   const showThemeToggle = useContext(ShowThemeToggle);
+  const [creatingProject, setCreatingProject] = useState(false);
   const { projectId, renderQueue } = useStudioShellContext();
   const { rightCollapsed, setRightCollapsed, setRightPanelTab } = usePanelLayoutContext();
   const isRendering = renderQueue.isRendering;
@@ -61,6 +68,26 @@ export const StudioHeader = memo(function StudioHeader({
           |
         </span>
         <span className="text-step-11 font-medium text-text-1">{projectId}</span>
+        {canCreateProjects && (
+          <Tooltip label="New project" side="bottom">
+            <IconButton
+              aria-label="New project"
+              size="sm"
+              icon={<Plus size={14} />}
+              onClick={() => setCreatingProject(true)}
+            />
+          </Tooltip>
+        )}
+        {creatingProject && (
+          <NewProjectDialog
+            onClose={() => setCreatingProject(false)}
+            onOpenProject={(id) => {
+              setCreatingProject(false);
+              // Studio follows the hash to the project, as a bookmark or the Back button would.
+              window.location.hash = buildProjectHash(id);
+            }}
+          />
+        )}
       </div>
       {/* Right: toolbar buttons */}
       <div className="flex items-center gap-3">

@@ -5,11 +5,12 @@ import {
   readFileSync,
   readdirSync,
   existsSync,
+  mkdirSync,
   writeFileSync,
   realpathSync,
-  unlinkSync,
+  rmSync,
 } from "node:fs";
-import { basename, join, relative, resolve, isAbsolute, sep } from "node:path";
+import { basename, dirname, join, relative, resolve, isAbsolute, sep } from "node:path";
 import type { ViteDevServer } from "vite";
 import {
   type ResolvedProject,
@@ -23,6 +24,7 @@ import {
   DEFAULT_HISTORY_ROOT,
   openProjectHistory,
   historyCache,
+  renderMetaPath,
 } from "@hyperframes/studio-server";
 import type { RegistryItem } from "@hyperframes/core/registry";
 import type { BundleOptions } from "@hyperframes/core/compiler";
@@ -104,6 +106,38 @@ export function createProjectSignatureCache({
 
 const isServableProjectId = (id: string) =>
   isValidProjectId(id) && !(process.platform === "win32" && id.includes(":"));
+
+/**
+ * Create `dataDir/id` and write `files` into it. The folder is made exclusively, so an existing
+ * project is never reused or overwritten (the error's code is EEXIST), and a failed write removes
+ * only the folder this call made.
+ */
+export function createProjectFolder(
+  dataDir: string,
+  id: string,
+  files: Record<string, string>,
+): ResolvedProject {
+  const projectDir = resolve(dataDir, id);
+  if (!isServableProjectId(id) || dirname(projectDir) !== resolve(dataDir)) {
+    throw new Error(`Not a project folder name: ${JSON.stringify(id)}`);
+  }
+  mkdirSync(dataDir, { recursive: true });
+  mkdirSync(projectDir);
+  try {
+    for (const [file, content] of Object.entries(files)) {
+      const target = resolve(projectDir, file);
+      if (target === projectDir || !isPathWithin(projectDir, target)) {
+        throw new Error(`Project file escapes its folder: ${JSON.stringify(file)}`);
+      }
+      mkdirSync(dirname(target), { recursive: true });
+      writeFileSync(target, content, { flag: "wx" });
+    }
+  } catch (err) {
+    rmSync(projectDir, { recursive: true, force: true });
+    throw err;
+  }
+  return { id, dir: realpathSync(projectDir) };
+}
 
 export function createViteAdapter(
   dataDir: string,
@@ -228,6 +262,10 @@ export function createViteAdapter(
         .sort((a, b) => (a.title ?? "").localeCompare(b.title ?? ""));
     },
 
+    createProject(id: string, files: Record<string, string>) {
+      return createProjectFolder(dataDir, id, files);
+    },
+
     // Studio's undo runs on the project's history: opened once per project; a failed open stays off unless the folder
     // changed while it opened.
     history(project: ResolvedProject) {
@@ -323,12 +361,10 @@ export function createViteAdapter(
         // User-initiated cancel: not a failure. Remove any output so the
         // cancelled job doesn't resurrect in the render history.
         state.status = "cancelled";
-        for (const fp of [
-          opts.outputPath,
-          opts.outputPath.replace(/\.(mp4|webm|mov)$/, ".meta.json"),
-        ]) {
+        for (const fp of [opts.outputPath, renderMetaPath(opts.outputPath)]) {
           try {
-            if (existsSync(fp)) unlinkSync(fp);
+            // A PNG sequence's output is a folder.
+            if (existsSync(fp)) rmSync(fp, { recursive: true, force: true });
           } catch {
             /* ignore */
           }
@@ -347,6 +383,7 @@ export function createViteAdapter(
             fps: opts.fps,
             quality: opts.quality as "draft" | "standard" | "high",
             format: opts.format,
+            ...(opts.endSeconds !== undefined ? { endSeconds: opts.endSeconds } : {}),
             ...(renderBodyScripts.length > 0 ? { renderBodyScripts } : {}),
             outputResolution: opts.outputResolution,
             ...(opts.composition ? { entryFile: opts.composition } : {}),
@@ -377,7 +414,7 @@ export function createViteAdapter(
           if (job.audioLoweredDb !== undefined) state.audioLoweredDb = job.audioLoweredDb;
           state.status = "complete";
           state.progress = 100;
-          const metaPath = opts.outputPath.replace(/\.(mp4|webm|mov)$/, ".meta.json");
+          const metaPath = renderMetaPath(opts.outputPath);
           writeFileSync(
             metaPath,
             JSON.stringify({
@@ -394,7 +431,7 @@ export function createViteAdapter(
           state.status = "failed";
           state.error = err instanceof Error ? err.message : String(err);
           try {
-            const metaPath = opts.outputPath.replace(/\.(mp4|webm|mov)$/, ".meta.json");
+            const metaPath = renderMetaPath(opts.outputPath);
             writeFileSync(metaPath, JSON.stringify({ status: "failed" }));
           } catch {
             /* ignore */

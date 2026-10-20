@@ -692,6 +692,23 @@ describe("syncRuntimeMedia", () => {
       expect(volumeSeen(hiddenClip())).toBe(0);
     });
 
+    it("zeroes a clip Studio's solo silenced, on itself or an ancestor, and nothing else", () => {
+      const own = createMockClip({ start: 0, end: 10, volume: 0.8 });
+      Object.defineProperty(own.el, "readyState", { value: 4, writable: true });
+      own.el.setAttribute("data-hf-solo-silenced", "");
+      document.body.appendChild(own.el);
+      expect(volumeSeen(own)).toBe(0);
+      own.el.removeAttribute("data-hf-solo-silenced");
+      expect(volumeSeen(own)).toBe(0.8);
+      const wrapper = document.createElement("div");
+      wrapper.setAttribute("data-hf-solo-silenced", "");
+      const nested = createMockClip({ start: 0, end: 10, volume: 0.8 });
+      Object.defineProperty(nested.el, "readyState", { value: 4, writable: true });
+      wrapper.appendChild(nested.el);
+      document.body.appendChild(wrapper);
+      expect(volumeSeen(nested)).toBe(0);
+    });
+
     // A visible clip is the control: the zero above has to come from the
     // ancestor, not from the fixture reading 0 for some other reason.
     it("leaves a visible clip at its authored volume", () => {

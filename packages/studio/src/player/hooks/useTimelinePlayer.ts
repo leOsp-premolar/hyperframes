@@ -5,6 +5,7 @@ import { usePlaybackKeyboard } from "./usePlaybackKeyboard";
 import { useTimelineSyncCallbacks } from "./useTimelineSyncCallbacks";
 import { useShadowPreviewReload } from "./useShadowPreviewReload";
 import { resolvePlaybackAdapter } from "./playbackAdapterResolution";
+import { landedSeekTime, settleOnFrame } from "./timelineSeekLanding";
 import { subscribePreviewFrame, transportAdapter } from "../store/previewFrameStore";
 import { clampToDuration } from "../lib/time";
 import { useTimelinePlayerLoop } from "./useTimelinePlayerLoop";
@@ -289,7 +290,7 @@ export function useTimelinePlayer({
     stopReverseLoop();
     const adapter = getAdapter();
     adapter?.pause();
-    if (adapter) setCurrentTime(adapter.getTime()); // sync store so Split/Delete have accurate time
+    if (adapter) setCurrentTime(settleOnFrame(adapter)); // sync store so Split/Delete have accurate time
     setIsPlaying(false);
     shuttleDirectionRef.current = null;
     shuttleSpeedIndexRef.current = 0;
@@ -317,8 +318,9 @@ export function useTimelinePlayer({
         playLocked,
       });
       adapter.seek(nextTime, options);
-      publishSeek(nextTime, options); // Direct DOM updates (playhead, timecode, progress) — no re-render
-      setCurrentTime(nextTime); // sync store so Split/Delete have accurate time
+      const shownTime = landedSeekTime(adapter, nextTime);
+      publishSeek(shownTime, options); // Direct DOM updates (playhead, timecode, progress) — no re-render
+      setCurrentTime(shownTime); // sync store so Split/Delete have accurate time
       if (!keepPlaying && !playLocked) scrubMusicAtSeek(iframeRef.current, nextTime);
       if (shouldResumeAfterSeek) {
         stopRAFLoop();

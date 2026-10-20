@@ -15,6 +15,7 @@ import { registerFontRoutes } from "./routes/fonts.js";
 import { registerRegistryRoutes } from "./routes/registry.js";
 import { registerSelectionRoutes } from "./routes/selection.js";
 import { registerMediaRoutes } from "./routes/media.js";
+import { registerMissingMediaRoutes } from "./routes/missingMedia.js";
 import { registerGlobalAssetRoutes } from "./routes/globalAssets.js";
 import { registerHistoryRoutes } from "./routes/history.js";
 import { replaceWithProjectDirMissing } from "./helpers/projectDirMissing.js";
@@ -72,6 +73,7 @@ export function createStudioApi(adapter: StudioApiAdapter): Hono {
   registerImageThumbnailRoutes(api, adapter);
   registerSelectionRoutes(api, adapter);
   registerMediaRoutes(api, adapter);
+  registerMissingMediaRoutes(api, adapter);
   registerWaveformRoutes(api, adapter);
   registerFreezeFrameRoutes(api, adapter);
   registerLoudnessRoutes(api, adapter);

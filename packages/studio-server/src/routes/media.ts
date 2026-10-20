@@ -5,7 +5,7 @@ import { basename, dirname, extname, join, posix } from "node:path";
 import type { MediaProcessingJobState, StudioApiAdapter } from "../types.js";
 import { requestedProjectPath } from "../helpers/requestSubPath.js";
 import { mkdirWithinProject, pinWithinProject, resolveWithinProject } from "../helpers/safePath.js";
-import { probeMediaMetadata } from "../helpers/mediaMetadata.js";
+import { probeMediaDetails } from "../helpers/mediaMetadata.js";
 
 const VIDEO_EXTENSIONS = new Set([
   ".mp4",
@@ -36,7 +36,7 @@ interface BackgroundRemovalBody {
 }
 
 type JobWithCreatedAt = MediaProcessingJobState & { createdAt: number };
-type ProbeMediaMetadata = typeof probeMediaMetadata;
+type ProbeMediaMetadata = typeof probeMediaDetails;
 
 function isVideoPath(path: string): boolean {
   return VIDEO_EXTENSIONS.has(extname(path).toLowerCase());
@@ -128,7 +128,7 @@ export function registerMediaRoutes(
 ): void {
   const mediaJobs = new Map<string, JobWithCreatedAt>();
   const TTL_MS = 300_000;
-  const readMediaMetadata = options.probeMediaMetadata ?? probeMediaMetadata;
+  const readMediaMetadata = options.probeMediaMetadata ?? probeMediaDetails;
 
   function cleanupFinishedJobs(): void {
     const now = Date.now();

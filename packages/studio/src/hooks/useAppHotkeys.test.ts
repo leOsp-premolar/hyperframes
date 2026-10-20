@@ -508,3 +508,25 @@ describe("dispatchPlainKey — G opens Audio Gain", () => {
     expect(event.defaultPrevented).toBe(false);
   });
 });
+
+describe("dispatchPlainKey — slip and roll tools", () => {
+  afterEach(() => usePlayerStore.getState().setActiveTool("select"));
+  const tool = () => usePlayerStore.getState().activeTool;
+
+  it("Y arms slip and U arms roll; the same key again goes back to select", () => {
+    dispatchPlainKey(press("y"), "y", callbacks());
+    expect(tool()).toBe("slip");
+    dispatchPlainKey(press("u"), "u", callbacks());
+    expect(tool()).toBe("roll");
+    dispatchPlainKey(press("u"), "u", callbacks());
+    expect(tool()).toBe("select");
+  });
+
+  it("Escape leaves slip or roll for select", () => {
+    dispatchPlainKey(press("y"), "y", callbacks());
+    const escape = press("Escape");
+    dispatchPlainKey(escape, "escape", callbacks());
+    expect(tool()).toBe("select");
+    expect(escape.defaultPrevented).toBe(true);
+  });
+});

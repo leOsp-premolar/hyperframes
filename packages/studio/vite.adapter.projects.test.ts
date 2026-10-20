@@ -4,6 +4,8 @@ import {
   existsSync,
   mkdtempSync,
   mkdirSync,
+  readdirSync,
+  readFileSync,
   realpathSync,
   renameSync,
   rmSync,
@@ -15,7 +17,11 @@ import { join, win32 } from "node:path";
 import { isValidProjectId } from "./src/utils/projectRouting";
 import { createStudioApi, type ProjectHistory } from "@hyperframes/studio-server";
 import type { ViteDevServer } from "vite";
-import { createProjectSignatureCache, createViteAdapter } from "./vite.adapter";
+import {
+  createProjectFolder,
+  createProjectSignatureCache,
+  createViteAdapter,
+} from "./vite.adapter";
 
 import { previewChangeOwner } from "./vite.preview-watch";
 
@@ -251,5 +257,82 @@ describe("Studio's dev server and the catalog", () => {
     expect(await response.json()).toEqual({
       error: "Installing catalog items needs hyperframes preview",
     });
+  });
+});
+
+const FILES = { "index.html": "<html></html>", "hyperframes.json": "{}" };
+
+describe("Studio's dev server creates projects", () => {
+  it("creates one from the API, even before the projects folder exists, and serves it", async () => {
+    const { data, app } = fixture();
+    rmSync(data, { recursive: true });
+    const res = await app.request("http://localhost/projects", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: "Summer Trip", width: 1280, height: 720 }),
+    });
+    expect(res.status).toBe(201);
+    expect(readFileSync(join(data, "summer-trip", "index.html"), "utf8")).toContain(
+      'data-width="1280"',
+    );
+    const listed = await (await app.request("http://localhost/projects")).json();
+    expect(listed).toMatchObject({ canCreateProjects: true, projects: [{ id: "summer-trip" }] });
+    expect((await app.request("http://localhost/projects/summer-trip")).status).toBe(200);
+  });
+
+  it("answers 409 for a taken name and keeps the existing project as it was", async () => {
+    const { data, app } = fixture();
+    mkdirSync(join(data, "summer-trip"));
+    writeFileSync(join(data, "summer-trip", "index.html"), "mine");
+    const res = await app.request("http://localhost/projects", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: "Summer trip", width: 1280, height: 720 }),
+    });
+    expect(res.status).toBe(409);
+    expect(readFileSync(join(data, "summer-trip", "index.html"), "utf8")).toBe("mine");
+  });
+});
+
+describe("createProjectFolder", () => {
+  it("never reuses an existing folder, even an empty one", () => {
+    const { data } = fixture();
+    mkdirSync(join(data, "empty"));
+    expect(() => createProjectFolder(data, "empty", FILES)).toThrow(
+      expect.objectContaining({ code: "EEXIST" }),
+    );
+    expect(readdirSync(join(data, "empty"))).toEqual([]);
+  });
+
+  it("does not follow a link that holds the name", () => {
+    const { root, data } = fixture();
+    const elsewhere = join(root, "elsewhere");
+    mkdirSync(elsewhere);
+    symlinkSync(elsewhere, join(data, "linked"), "dir");
+    expect(() => createProjectFolder(data, "linked", FILES)).toThrow(
+      expect.objectContaining({ code: "EEXIST" }),
+    );
+    expect(readdirSync(elsewhere)).toEqual([]);
+  });
+
+  it.each(["", ".", "..", "../outside", "a/b", "a\\b"])("refuses the id %j", (id) => {
+    const { root, data } = fixture();
+    expect(() => createProjectFolder(data, id, FILES)).toThrow();
+    expect(readdirSync(root)).not.toContain("outside");
+  });
+
+  it("removes the folder it made when a file would escape it, and writes nothing outside", () => {
+    const { root, data } = fixture();
+    expect(() =>
+      createProjectFolder(data, "demo", { "index.html": "ok", "../../escaped.txt": "no" }),
+    ).toThrow(/escapes its folder/);
+    expect(existsSync(join(data, "demo"))).toBe(false);
+    expect(existsSync(join(root, "escaped.txt"))).toBe(false);
+  });
+
+  it("writes nested files", () => {
+    const { data } = fixture();
+    const project = createProjectFolder(data, "demo", { "compositions/scene.html": "s" });
+    expect(readFileSync(join(project.dir, "compositions", "scene.html"), "utf8")).toBe("s");
   });
 });

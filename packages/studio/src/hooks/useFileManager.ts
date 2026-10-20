@@ -28,6 +28,11 @@ interface UseFileManagerOptions {
 
 // ── Hook ──
 
+/** `mediaOnly`: the Assets panel and timeline drops, which can only use media and fonts. */
+export interface UploadOptions {
+  mediaOnly?: boolean;
+}
+
 export function useFileManager({
   projectId,
   showToast,
@@ -193,7 +198,7 @@ export function useFileManager({
   // ── Upload ──
 
   const uploadProjectFiles = useCallback(
-    async (files: Iterable<File>, dir?: string): Promise<string[]> => {
+    async (files: Iterable<File>, dir?: string, options: UploadOptions = {}): Promise<string[]> => {
       const pid = projectIdRef.current;
       const fileList = Array.from(files);
       if (!pid || fileList.length === 0) return [];
@@ -203,7 +208,11 @@ export function useFileManager({
         formData.append("file", file);
       }
 
-      const qs = dir ? `?dir=${encodeURIComponent(dir)}` : "";
+      const query = new URLSearchParams();
+      if (dir) query.set("dir", dir);
+      // The server then refuses what the media import cannot use, instead of storing it unseen.
+      if (options.mediaOnly) query.set("mediaOnly", "1");
+      const qs = query.size > 0 ? `?${query}` : "";
       try {
         const res = await studioApiFetch(`/api/projects/${encodeURIComponent(pid)}/upload${qs}`, {
           method: "POST",
@@ -368,8 +377,8 @@ export function useFileManager({
   const handleMoveFile = handleRenameFile;
 
   const handleImportFiles = useCallback(
-    async (files: FileList | File[], dir?: string) => {
-      return uploadProjectFiles(Array.from(files), dir);
+    async (files: FileList | File[], dir?: string, options?: UploadOptions) => {
+      return uploadProjectFiles(Array.from(files), dir, options);
     },
     [uploadProjectFiles],
   );

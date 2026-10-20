@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=640, height=360" />
+    <style>
+      html,
+      body {
+        margin: 0;
+        width: 640px;
+        height: 360px;
+        overflow: hidden;
+        background: #000;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- The export-options gate copies its 4s source clip to assets/clip.mp4 before opening. -->
+    <div
+      id="root"
+      data-composition-id="main"
+      data-start="0"
+      data-duration="4"
+      data-width="640"
+      data-height="360"
+      data-no-timeline
+    >
+      <video
+        id="clip"
+        class="clip"
+        src="assets/clip.mp4"
+        data-start="0"
+        data-duration="4"
+        data-track-index="0"
+        data-has-audio="true"
+        style="position: absolute; inset: 0; width: 640px; height: 360px"
+      ></video>
+    </div>
+  </body>
+</html>
