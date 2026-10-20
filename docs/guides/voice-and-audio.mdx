@@ -62,6 +62,32 @@ npx hyperframes tts "Con la primera luz de la mañana" --provider elevenlabs \
 
 See [`tts`](/packages/cli#tts) for every option.
 
+### Studio voices
+
+**Studio voices** is a set of ten Spanish voices that runs from very high to very low, five
+women and five men. Each starts from an account voice near its pitch. The engine measures
+every line and moves it to the voice's pitch, at most four semitones, so the ladder holds from
+one sentence to the next. It also moves the formants a little to make the voice younger and
+brighter or bigger and darker. The voices use ElevenLabs when its key is set, else Kokoro on
+this machine, with the ends of the ladder a little less far apart. They need an ffmpeg with the
+`rubberband` filter.
+
+| Voice   | Register        | Median pitch | Timbre  |
+| ------- | --------------- | ------------ | ------- |
+| Aurora  | woman, very high | 245 Hz      | bright  |
+| Brisa   | woman, high      | 225 Hz      | bright  |
+| Clara   | woman, mid-high  | 205 Hz      | natural |
+| Dalia   | woman, mid       | 185 Hz      | warm    |
+| Elena   | woman, low       | 165 Hz      | warm    |
+| Fabián  | man, high        | 150 Hz      | natural |
+| Gael    | man, mid-high    | 135 Hz      | bright  |
+| Hugo    | man, mid         | 120 Hz      | natural |
+| Íker    | man, low         | 105 Hz      | warm    |
+| Joaquín | man, very low    | 92 Hz       | warm    |
+
+Speech made from ElevenLabs voices follows your ElevenLabs plan's terms; on the free plan
+that means attribution and no commercial use.
+
 ## Transcribe recorded speech
 
 Transcription creates timed words from an audio or video file. Start with the

@@ -1,5 +1,5 @@
 /** Engines `synthesizeSpeech` can run. The cloud ones read their API key from the environment. */
-export const VOICE_PROVIDERS = ["elevenlabs", "openai", "kokoro"] as const;
+export const VOICE_PROVIDERS = ["elevenlabs", "openai", "kokoro", "studio"] as const;
 export type VoiceProviderId = (typeof VOICE_PROVIDERS)[number];
 /** "auto": the first cloud provider with a key (ElevenLabs, then OpenAI), else Kokoro. */
 export type VoiceProviderChoice = VoiceProviderId | "auto";
@@ -80,6 +80,8 @@ export interface ProviderSpeech {
   styleApplied: boolean;
   /** Seconds into `audio`, before any tempo change. */
   words?: SpeechWord[];
+  /** ffmpeg audio filters applied after the tempo change; they must keep the length. */
+  filters?: string;
 }
 
 export interface VoiceProvider {

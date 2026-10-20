@@ -6,17 +6,18 @@ previous one's tests.
 
 ## Stages
 
-| Stage | Branch                         | State | Scope                                                                    |
-| ----- | ------------------------------ | ----- | ------------------------------------------------------------------------ |
-| S0    | `studio/s0-e2e-workflow`       | Done  | Browser gate: import, place, split, trim, undo/redo, reload, export      |
-| S4    | `studio/s4-create-project`     | Done  | New project from the header or the empty start screen; `POST /projects`  |
-| S2    | `studio/s2-media-metadata`     | Done  | Media metadata on asset cards; upload validation                         |
-| S3    | `studio/s3-missing-media`      | Done  | Missing media detection and replacement                                  |
-| S1    | `studio/s1-export-options`     | Done  | Export the in/out range; audio-only export; GIF and PNG sequence options |
-| S5    | `studio/s5-slip-roll`          | Done  | Slip and roll editing                                                    |
-| S6    | `studio/s6-track-lock-solo`    | Done  | Track lock and solo                                                      |
-| S7    | `studio/s7-keyframes-playback` | Done  | Browser verification of keyframes and playback                           |
-| S8    | `studio/s8-voice-api`          | Done  | Voice API: ElevenLabs and OpenAI voices in the CLI, the API and Studio   |
+| Stage | Branch                         | State  | Scope                                                                       |
+| ----- | ------------------------------ | ------ | --------------------------------------------------------------------------- |
+| S0    | `studio/s0-e2e-workflow`       | Done   | Browser gate: import, place, split, trim, undo/redo, reload, export         |
+| S4    | `studio/s4-create-project`     | Done   | New project from the header or the empty start screen; `POST /projects`     |
+| S2    | `studio/s2-media-metadata`     | Done   | Media metadata on asset cards; upload validation                            |
+| S3    | `studio/s3-missing-media`      | Done   | Missing media detection and replacement                                     |
+| S1    | `studio/s1-export-options`     | Done   | Export the in/out range; audio-only export; GIF and PNG sequence options    |
+| S5    | `studio/s5-slip-roll`          | Done   | Slip and roll editing                                                       |
+| S6    | `studio/s6-track-lock-solo`    | Done   | Track lock and solo                                                         |
+| S7    | `studio/s7-keyframes-playback` | Done   | Browser verification of keyframes and playback                              |
+| S8    | `studio/s8-voice-api`          | Done   | Voice API: ElevenLabs and OpenAI voices in the CLI, the API and Studio      |
+| S9    | `studio/s9-voice-library`      | Review | Studio voices: ten Spanish voices from very high to very low, women and men |
 
 ## Known limitations to plan for
 
@@ -286,3 +287,91 @@ Limits:
   separately.
 - **Long scripts are not split:** a line over a provider's limit (ElevenLabs 10,000 characters,
   OpenAI 4,096) is refused with the limit named.
+
+### S9: studio voices
+
+Recorded with S9, for review.
+
+The voice engine gains a `studio` provider with ten voices of its own, in Spanish, from very
+high to very low: Aurora, Brisa, Clara, Dalia and Elena (women), Fabián, Gael, Hugo, Íker and
+Joaquín (men). Each is an account voice moved a little:
+
+- **Pitch:** rubberband changes the pitch with the formants held.
+- **Timbre:** asetrate moves the formants by at most 6%, and rubberband restores the length, so
+  words keep their timings.
+- **Tone:** bass and treble shelves of at most 2.5 dB.
+
+How the ladder was built:
+
+1. **Survey.** Praat measured the ElevenLabs account voices:
+   - Sixteen from their English previews. Laura, Charlie, George, Brian and Daniel serve
+     previews from a host this container cannot reach.
+   - Then each candidate speaking the same Spanish line: median pitch, its 10–90% range,
+     F1–F3, spectral centre and harmonics-to-noise ratio.
+   - The Kokoro Spanish voices were measured the same way.
+
+   In Spanish, from high to low:
+
+   | Voice         | Median pitch (Hz) |
+   | ------------- | ----------------- |
+   | Bella         | 212               |
+   | Matilda       | 210               |
+   | Sarah         | 187               |
+   | Jessica       | 186               |
+   | Eric          | 163               |
+   | Daniel        | 140               |
+   | Roger         | 131               |
+   | George        | 124               |
+   | Bill          | 121               |
+   | Will          | 116               |
+   | Liam          | 115               |
+   | Adam          | 111               |
+   | Chris         | 108               |
+   | Brian         | 105               |
+   | Callum        | 98                |
+   | Dora (Kokoro) | 174               |
+   | Alex (Kokoro) | 123               |
+
+2. **Bases.** Each voice starts from the base nearest its target, preferring voices whose
+   pitch varies less. Liam, Matilda and Chris swing 14 to 17 semitones within a line. George
+   and Brian replaced Liam and Chris for Íker and Joaquín.
+
+3. **Per-line correction.** Fixed offsets were not enough: ElevenLabs reads each line
+   differently, and on a second sentence Clara landed at 248 Hz (target 205) and Íker at 139
+   (target 105).
+   - The engine now measures every base line with its own YIN pitch tracker and moves it to the
+     target, at most 4 semitones on ElevenLabs and 6 on Kokoro.
+   - A line it cannot measure gets the fixed offset.
+   - On two different sentences (a statement and a question), all ten landed in order. Praat
+     read every line within 8 Hz of its target, Gael 5 and 8 Hz low, the rest within 3 Hz:
+
+   | Voice   | Target (Hz) | Statement (Hz) | Question (Hz) |
+   | ------- | ----------- | -------------- | ------------- |
+   | Aurora  | 245         | 245            | 237           |
+   | Brisa   | 225         | 224            | 224           |
+   | Clara   | 205         | 205            | 205           |
+   | Dalia   | 185         | 183            | 183           |
+   | Elena   | 165         | 165            | 162           |
+   | Fabián  | 150         | 148            | 148           |
+   | Gael    | 135         | 130            | 127           |
+   | Hugo    | 120         | 119            | 120           |
+   | Íker    | 105         | 103            | 103           |
+   | Joaquín | 92          | 91             | 92            |
+
+Found and fixed: asetrate takes an absolute rate, so the 24 kHz speech Kokoro and OpenAI send
+would have played almost twice as fast. The chain now resamples to 44.1 kHz first.
+
+Limits:
+
+- **No one has listened to them yet.** The checks are measurements (pitch, formants,
+  harmonics-to-noise, length), not ears. Moves of 3 to 4 semitones on the lowest voices may
+  sound processed.
+- **The engine's YIN tracker reads gravelly low voices higher than Praat,** by up to about 3
+  semitones (Brian 120 Hz against Praat's 105). Targets are in the engine's own reading, so the
+  ladder is consistent, but a Praat measure of the low voices comes out a little lower.
+- **On Kokoro the ends of the ladder fall short,** because there is one Spanish voice per gender
+  and moves stop at 6 semitones.
+- **Studio voices need ffmpeg with rubberband.** Without it they refuse with a message that
+  says so.
+- **Speech from ElevenLabs voices follows the account's plan terms.** On the free plan that
+  means attribution and no commercial use.

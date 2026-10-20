@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, dirname, extname, join } from "node:path";
@@ -19,10 +20,23 @@ const CODEC_ARGS: Record<string, string[]> = {
  * or not at all: ffmpeg writes beside it under a name no media list shows, and the result is
  * renamed into place, so a project watcher never lists half a file.
  */
+const rubberbandByBinary = new Map<string, boolean>();
+
+/** Studio voices need ffmpeg built with librubberband; some minimal builds leave it out. */
+function hasRubberband(ffmpeg: string): boolean {
+  let known = rubberbandByBinary.get(ffmpeg);
+  if (known === undefined) {
+    const list = execFileSync(ffmpeg, ["-hide_banner", "-filters"], { encoding: "utf8" });
+    known = /\srubberband\s/.test(list);
+    rubberbandByBinary.set(ffmpeg, known);
+  }
+  return known;
+}
+
 export async function writeSpeechFile(
   audio: Uint8Array,
   outputPath: string,
-  options: { tempo: number; signal: AbortSignal },
+  options: { tempo: number; filters?: string; signal: AbortSignal },
 ): Promise<number> {
   const ext = extname(outputPath).toLowerCase();
   const codec = CODEC_ARGS[ext];
@@ -36,13 +50,23 @@ export async function writeSpeechFile(
       "ffmpeg is required to write speech; run: npx hyperframes doctor",
     );
   }
+  if (options.filters?.includes("rubberband") && !hasRubberband(ffmpeg)) {
+    throw new VoiceError(
+      "encode_failed",
+      "Studio voices need ffmpeg with the rubberband filter (librubberband); install a full ffmpeg build.",
+    );
+  }
   const scratch = mkdtempSync(join(tmpdir(), "hf-voice-"));
   const partial = join(dirname(outputPath), `.${basename(outputPath)}.${process.pid}.partial`);
   try {
     const source = join(scratch, "provider-audio");
     writeFileSync(source, audio);
     mkdirSync(dirname(outputPath), { recursive: true });
-    const filter = Math.abs(options.tempo - 1) > 1e-3 ? ["-af", `atempo=${options.tempo}`] : [];
+    const chain = [
+      ...(Math.abs(options.tempo - 1) > 1e-3 ? [`atempo=${options.tempo}`] : []),
+      ...(options.filters ? [options.filters] : []),
+    ];
+    const filter = chain.length ? ["-af", chain.join(",")] : [];
     const args = ["-y", "-v", "error", "-i", source, ...filter, "-ar", "44100", "-ac", "1"];
     await stoppableExecFile(ffmpeg, [...args, ...codec, partial], {
       stdio: ["ignore", "ignore", "pipe"],

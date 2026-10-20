@@ -52,13 +52,19 @@ function deps(env: VoiceEnv = {}, overrides: Partial<VoiceDeps> = {}) {
   const eleven = fakeProvider("elevenlabs");
   const open = fakeProvider("openai");
   const local = fakeProvider("kokoro");
-  const writes: { outputPath: string; tempo: number }[] = [];
+  const presets = fakeProvider("studio", { configured: () => true });
+  const writes: { outputPath: string; tempo: number; filters?: string }[] = [];
   const d: VoiceDeps = {
     env,
     fetch: globalThis.fetch,
-    providers: { elevenlabs: eleven.provider, openai: open.provider, kokoro: local.provider },
+    providers: {
+      elevenlabs: eleven.provider,
+      openai: open.provider,
+      kokoro: local.provider,
+      studio: presets.provider,
+    },
     writeSpeech: async (_audio, outputPath, options) => {
-      writes.push({ outputPath, tempo: options.tempo });
+      writes.push({ outputPath, tempo: options.tempo, filters: options.filters });
       return 2;
     },
     transcribeWords: async () => [{ text: "hola", start: 0.1, end: 0.4 }],
@@ -126,6 +132,20 @@ describe("synthesizeSpeechWith", () => {
     expect(writes[0]?.tempo).toBe(0.5);
     expect(result.words).toEqual([{ text: "Hola", start: 1, end: 2 }]);
     expect(result.wordsSource).toBe("provider");
+  });
+
+  it("hands the provider's own filters to the encoder after the tempo", async () => {
+    const { d, writes } = deps();
+    d.providers.studio.synthesize = async () => ({
+      audio: new Uint8Array([1]),
+      appliedSpeed: 1,
+      styleApplied: false,
+      filters: "rubberband=pitch=1.1",
+    });
+    await synthesizeSpeechWith(d, { ...base, provider: "studio", voice: "aurora", speed: 0.8 });
+    expect(writes).toEqual([
+      { outputPath: "/tmp/hf-voice-test/line.wav", tempo: 0.8, filters: "rubberband=pitch=1.1" },
+    ]);
   });
 
   it("transcribes the written file when the provider has no word timings", async () => {
@@ -242,6 +262,7 @@ describe("describeVoiceProvidersWith", () => {
       ["elevenlabs", false, "set up elevenlabs"],
       ["openai", true, undefined],
       ["kokoro", true, undefined],
+      ["studio", true, undefined],
     ]);
     expect(JSON.stringify(summary)).not.toContain("secret");
   });
