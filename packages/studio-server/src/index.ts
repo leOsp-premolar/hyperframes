@@ -20,6 +20,11 @@ export type {
   StudioSelectionResponse,
   StudioSelectionSnapshot,
   StudioSelectionTextField,
+  StudioVoice,
+  StudioVoiceProvider,
+  StudioVoiceProviders,
+  StudioVoiceRequest,
+  StudioVoiceResult,
 } from "./types.js";
 export { isSafePath, walkDir } from "./helpers/safePath.js";
 export { stampProjectHfIds } from "./helpers/hfIdPersist.js";

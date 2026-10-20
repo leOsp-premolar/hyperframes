@@ -139,6 +139,23 @@ export function createProjectFolder(
   return { id, dir: realpathSync(projectDir) };
 }
 
+type VoiceHooks = Required<
+  Pick<StudioApiAdapter, "describeVoiceProviders" | "listVoices" | "synthesizeVoice">
+>;
+
+/** The CLI's voice API, loaded through Vite on first use like the background-removal pipeline. */
+function voiceHooks(server: ViteDevServer): VoiceHooks {
+  const load = async (): Promise<VoiceHooks> => {
+    const mod = await server.ssrLoadModule(resolve(__dirname, "../cli/src/voice/studioHooks.ts"));
+    return mod.voiceAdapterHooks();
+  };
+  return {
+    describeVoiceProviders: async () => (await load()).describeVoiceProviders(),
+    listVoices: async (provider, signal) => (await load()).listVoices(provider, signal),
+    synthesizeVoice: async (opts) => (await load()).synthesizeVoice(opts),
+  };
+}
+
 export function createViteAdapter(
   dataDir: string,
   server: ViteDevServer,
@@ -441,6 +458,8 @@ export function createViteAdapter(
 
       return state;
     },
+
+    ...voiceHooks(server),
 
     startBackgroundRemoval(opts) {
       return createBackgroundRemovalJob(opts, async (renderOpts) => {

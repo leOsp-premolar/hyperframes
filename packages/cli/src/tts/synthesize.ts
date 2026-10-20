@@ -1,5 +1,5 @@
 // fallow-ignore-file complexity
-import { execFileSync } from "node:child_process";
+import { execFile, execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, readdirSync, unlinkSync } from "node:fs";
 import { join, dirname, basename } from "node:path";
 import { homedir } from "node:os";
@@ -12,6 +12,20 @@ import {
 } from "./manager.js";
 import { findPython, hasPythonPackage } from "./python.js";
 import { writeNewFileSync } from "../utils/writeNewFile.js";
+
+/** execFile off the event loop, its stderr kept on a failure as execFileSync keeps it. */
+function execFileText(
+  file: string,
+  args: string[],
+  options: { timeout: number; env: NodeJS.ProcessEnv; signal: AbortSignal },
+): Promise<string> {
+  return new Promise((resolve, reject) => {
+    execFile(file, args, { ...options, encoding: "utf-8" }, (err, stdout, stderr) => {
+      if (err) reject(Object.assign(err, { stderr }));
+      else resolve(stdout);
+    });
+  });
+}
 
 // ---------------------------------------------------------------------------
 // Inline Python script for Kokoro synthesis
@@ -137,6 +151,11 @@ export interface SynthesizeOptions {
    */
   lang?: SupportedLang;
   onProgress?: (message: string) => void;
+  /**
+   * Run Kokoro as a child process the signal can end, without blocking the event loop, so a
+   * server keeps answering while it speaks. Without one, synthesis blocks as it always has.
+   */
+  signal?: AbortSignal;
 }
 
 export interface SynthesizeResult {
@@ -195,16 +214,25 @@ export async function synthesize(
   options?.onProgress?.(`Generating speech with voice ${voice} (${lang})...`);
   try {
     const espeakLang = ESPEAK_LANG_OVERRIDES[lang] ?? lang;
-    const stdout = execFileSync(
-      python,
-      [scriptPath, modelPath, voicesPath, text, voice, String(speed), outputPath, espeakLang],
-      {
-        encoding: "utf-8",
-        timeout: 300_000,
-        stdio: ["pipe", "pipe", "pipe"],
-        env: { ...process.env, ORT_DISABLE_TELEMETRY: "1" },
-      },
-    );
+    const args = [
+      scriptPath,
+      modelPath,
+      voicesPath,
+      text,
+      voice,
+      String(speed),
+      outputPath,
+      espeakLang,
+    ];
+    const env = { ...process.env, ORT_DISABLE_TELEMETRY: "1" };
+    const stdout = options?.signal
+      ? await execFileText(python, args, { timeout: 300_000, env, signal: options.signal })
+      : execFileSync(python, args, {
+          encoding: "utf-8",
+          timeout: 300_000,
+          stdio: ["pipe", "pipe", "pipe"],
+          env,
+        });
 
     if (!existsSync(outputPath)) {
       throw new Error("Synthesis completed but no output file was created");
@@ -227,6 +255,7 @@ export async function synthesize(
       langApplied: result.langApplied,
     };
   } catch (err: unknown) {
+    if (options?.signal?.aborted) throw options.signal.reason;
     // If the error is our own JSON parse failure but the file was created,
     // re-throw with a clearer message rather than returning fabricated data
     if (err instanceof SyntaxError && existsSync(outputPath)) {

@@ -75,6 +75,7 @@ import type { RenderJob } from "@hyperframes/producer";
 import { isWithinProjectRoot } from "@hyperframes/parsers/asset-resolution";
 import { seekCompositionTimeline } from "../capture/captureCompositionFrame.js";
 import { createThumbnailPages } from "./thumbnailPages.js";
+import { voiceAdapterHooks } from "../voice/studioHooks.js";
 import {
   assertWebGpuAdapterAvailable,
   compositionRequiresWebGpu,
@@ -705,6 +706,8 @@ export function createStudioServer(options: StudioServerOptions): StudioServer {
 
       return state;
     },
+
+    ...voiceAdapterHooks(),
 
     startBackgroundRemoval(opts) {
       return createBackgroundRemovalJob(opts, async (renderOpts) => {

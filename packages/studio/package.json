@@ -87,6 +87,7 @@
     "test:track-lock-solo": "node tests/e2e/track-lock-solo.mjs",
     "test:keyframes-playback": "node tests/e2e/keyframes-playback.mjs",
     "test:missing-media": "node tests/e2e/missing-media.mjs",
+    "test:voice-api": "node tests/e2e/voice-api.mjs",
     "bench:timeline-bulk-actions": "node tests/e2e/timeline-bulk-actions.mjs",
     "test:timeline-virtualization": "TIMELINE_ROW_VIRTUALIZATION=on TIMELINE_ELEMENT_COUNT=50000 node tests/e2e/timeline-virtualization.mjs",
     "test:watch": "vitest",

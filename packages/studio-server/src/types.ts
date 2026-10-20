@@ -28,6 +28,59 @@ export interface RenderJobState {
   cancel?: () => void;
 }
 
+/** A voice engine as the CLI's voice API describes it. It never carries a key. */
+export interface StudioVoiceProvider {
+  id: string;
+  label: string;
+  local: boolean;
+  configured: boolean;
+  setupHint?: string;
+  defaultVoice: string;
+  defaultModel: string;
+  models: readonly string[];
+  styleModels: readonly string[];
+  nativeWords: boolean;
+  maxCharacters: number;
+}
+
+export interface StudioVoiceProviders {
+  /** The provider "auto" picks right now. */
+  auto: string;
+  providers: StudioVoiceProvider[];
+}
+
+export interface StudioVoice {
+  id: string;
+  name: string;
+  gender?: string;
+  language?: string;
+  description?: string;
+  previewUrl?: string;
+}
+
+/** What to say and how; the adapter's voice API checks every field. */
+export interface StudioVoiceRequest {
+  text: string;
+  provider?: string;
+  voice?: string;
+  model?: string;
+  speed?: number;
+  style?: string;
+  language?: string;
+  words?: boolean;
+}
+
+export interface StudioVoiceResult {
+  provider: string;
+  voice: string;
+  model: string;
+  durationSeconds: number;
+  speed: number;
+  styleApplied: boolean;
+  words?: Array<{ text: string; start: number; end: number }>;
+  wordsSource?: string;
+}
+
 export interface MediaProcessingJobState {
   id: string;
   status: "processing" | "complete" | "failed";
@@ -231,6 +284,23 @@ export interface StudioApiAdapter {
     device?: "auto" | "cpu" | "coreml" | "cuda";
     jobId: string;
   }) => MediaProcessingJobState;
+
+  /** Optional: the voice engines and which are set up. Without it the voice routes answer 501. */
+  describeVoiceProviders?: () => Promise<StudioVoiceProviders> | StudioVoiceProviders;
+
+  /** Optional: a provider's voices. A known failure rejects with an error whose `code` names it. */
+  listVoices?: (provider: string, signal: AbortSignal) => Promise<StudioVoice[]>;
+
+  /**
+   * Optional: speak `request.text` into `outputPath`, an absolute path inside the project the
+   * route already picked. Rejects like `listVoices`; `signal` ends when the request does.
+   */
+  synthesizeVoice?: (opts: {
+    project: ResolvedProject;
+    request: StudioVoiceRequest;
+    outputPath: string;
+    signal: AbortSignal;
+  }) => Promise<StudioVoiceResult>;
 
   /** Optional: generate a thumbnail at the route's explicit output dimensions. */
   generateThumbnail?: (opts: {

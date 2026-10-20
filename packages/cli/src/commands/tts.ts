@@ -4,6 +4,7 @@ import { isTextFile } from "../utils/textFile.js";
 import { defineCommand } from "citty";
 import type { Example } from "./_examples.js";
 import { readFileSync } from "node:fs";
+import { isVoiceProviderChoice, VOICE_PROVIDERS } from "../voice/types.js";
 
 export const examples: Example[] = [
   ["Generate speech from text", 'hyperframes tts "Welcome to HyperFrames"'],
@@ -20,6 +21,16 @@ export const examples: Example[] = [
   ],
   ["Read text from a file", "hyperframes tts script.txt"],
   ["List available voices", "hyperframes tts --list"],
+  [
+    "Speak with ElevenLabs (ELEVENLABS_API_KEY) and save word timings",
+    'hyperframes tts "Con la primera luz" --provider elevenlabs --lang es --words words.json',
+  ],
+  [
+    "Direct an OpenAI voice (OPENAI_API_KEY)",
+    'hyperframes tts "Una pequeña semilla despertó" --provider openai --voice coral --style "tierna, cálida y pausada"',
+  ],
+  ["Use the best provider that has a key", 'hyperframes tts "Hola" --provider auto -o hola.mp3'],
+  ["List an ElevenLabs account's voices", "hyperframes tts --list --provider elevenlabs"],
 ];
 import { resolve } from "node:path";
 import * as clack from "@clack/prompts";
@@ -40,7 +51,8 @@ const langList = SUPPORTED_LANGS.join(", ");
 export default defineCommand({
   meta: {
     name: "tts",
-    description: "Generate speech audio from text using a local AI model (Kokoro-82M)",
+    description:
+      "Generate speech audio from text: Kokoro-82M on this machine, or ElevenLabs and OpenAI voices",
   },
   args: {
     input: {
@@ -54,13 +66,32 @@ export default defineCommand({
     },
     output: {
       type: "string",
-      description: "Output file path (default: speech.wav in current directory)",
+      description:
+        "Output file path (default: speech.wav in current directory); .mp3 with --provider",
       alias: ["o", "out"],
+    },
+    provider: {
+      type: "string",
+      description: `Voice engine: kokoro (default, local), ${VOICE_PROVIDERS.filter((p) => p !== "kokoro").join(", ")} or auto (the first with an API key, else kokoro)`,
+      alias: "p",
     },
     voice: {
       type: "string",
-      description: `Voice ID (default: ${DEFAULT_VOICE}). Options: ${voiceList}`,
+      description: `Voice ID (Kokoro default: ${DEFAULT_VOICE}). Kokoro options: ${voiceList}. Other providers: see --list --provider <name>`,
       alias: "v",
+    },
+    model: {
+      type: "string",
+      description:
+        "Provider model, e.g. eleven_multilingual_v2, eleven_v3, gpt-4o-mini-tts, tts-1-hd",
+    },
+    style: {
+      type: "string",
+      description: 'How to say it, e.g. "warm and tender, unhurried" (OpenAI gpt-4o-mini-tts)',
+    },
+    words: {
+      type: "string",
+      description: "Also write word timings to this .json file (transcript.json format)",
     },
     speed: {
       type: "string",
@@ -90,9 +121,19 @@ export default defineCommand({
       failUsage();
     }
 
+    const provider = args.provider ?? "kokoro";
+    if (!isVoiceProviderChoice(provider)) {
+      console.error(
+        c.error(`Unknown --provider "${provider}". Use ${VOICE_PROVIDERS.join(", ")} or auto.`),
+      );
+      failUsage();
+    }
+
     // ── List voices mode ──────────────────────────────────────────────
     if (args.list) {
-      return listVoices(args.json);
+      if (provider === "kokoro") return listVoices(args.json);
+      const { listProviderVoices } = await import("./ttsVoiceApi.js");
+      return listProviderVoices(provider, args.json);
     }
 
     // ── Resolve input text ────────────────────────────────────────────
@@ -126,6 +167,24 @@ export default defineCommand({
     if (!Number.isFinite(speed) || speed < 0.1 || speed > 3) {
       console.error(c.error("Speed must be a number between 0.1 and 3.0"));
       failCommand();
+    }
+
+    // Anything beyond Kokoro's own options goes through the voice API, which speaks for every
+    // provider; plain Kokoro keeps the path and output it has always had.
+    if (provider !== "kokoro" || args.words || args.style || args.model) {
+      const { runCloudSpeech } = await import("./ttsVoiceApi.js");
+      return runCloudSpeech({
+        text,
+        output,
+        provider,
+        voice: args.voice,
+        model: args.model,
+        speed,
+        style: args.style,
+        language: args.lang,
+        wordsPath: args.words,
+        json: args.json,
+      });
     }
 
     const inferredLang = inferLangFromVoiceId(voice);

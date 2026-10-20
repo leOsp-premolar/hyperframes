@@ -1,4 +1,4 @@
-import { memo, useCallback, type ReactNode } from "react";
+import { memo, useCallback, useState, type ReactNode } from "react";
 import { SourceEditor } from "./editor/SourceEditor";
 import { FileTree } from "./editor/FileTree";
 import { MediaPreview } from "./MediaPreview";
@@ -12,6 +12,8 @@ import { isMediaFile } from "../utils/mediaTypes";
 import { useStudioShellContext } from "../contexts/StudioContext";
 import { useFileManagerContext } from "../contexts/FileManagerContext";
 import { getPersistedRenderSettings } from "./renders/renderSettings";
+import { VoiceDialog } from "./VoiceDialog";
+import type { VoiceDone } from "./VoiceForm";
 
 interface StudioLeftPanelsProps {
   onSelectComposition: (comp: string) => void;
@@ -48,7 +50,8 @@ export const StudioLeftPanels = memo(function StudioLeftPanels({
   onAddAssetToTimeline,
   onAddCompositionToTimeline,
 }: StudioLeftPanelsProps) {
-  const { projectId, renderQueue, waitForPendingDomEditSaves } = useStudioShellContext();
+  const { projectId, renderQueue, waitForPendingDomEditSaves, showToast } = useStudioShellContext();
+  const [voiceOpen, setVoiceOpen] = useState(false);
   const {
     compositions,
     assets,
@@ -64,7 +67,18 @@ export const StudioLeftPanels = memo(function StudioLeftPanels({
     handleMoveFile,
     handleImportFiles,
     handleContentChange,
+    refreshFileTree,
   } = useFileManagerContext();
+
+  const handleVoiceDone = useCallback(
+    async (outcome: VoiceDone) => {
+      setVoiceOpen(false);
+      await refreshFileTree();
+      const seconds = outcome.durationSeconds.toFixed(1);
+      showToast(`Voice saved: ${outcome.path} (${seconds} s, ${outcome.provider})`, "info");
+    },
+    [refreshFileTree, showToast],
+  );
 
   const handleRenderComposition = useCallback(
     async (comp: string) => {
@@ -122,7 +136,15 @@ export const StudioLeftPanels = memo(function StudioLeftPanels({
             onDelete={handleDeleteFile}
             onRename={handleRenameFile}
             onAddAssetToTimeline={onAddAssetToTimeline}
+            onGenerateVoice={() => setVoiceOpen(true)}
           />
+          {voiceOpen && (
+            <VoiceDialog
+              projectId={projectId}
+              onDone={(outcome) => void handleVoiceDone(outcome)}
+              onClose={() => setVoiceOpen(false)}
+            />
+          )}
         </PanelColumn>
       </Dock.Panel>
       <Dock.Panel id="code">

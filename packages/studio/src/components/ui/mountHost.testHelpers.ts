@@ -30,3 +30,30 @@ export function cleanupMounted(): void {
   act(() => root.unmount());
   host.remove();
 }
+
+/** Sets a field's value the way typing does: React only hears the native event after the setter. */
+export function typeInto(host: HTMLElement, selector: string, value: string): void {
+  const el = host.querySelector(selector);
+  if (
+    !(
+      el instanceof HTMLInputElement ||
+      el instanceof HTMLSelectElement ||
+      el instanceof HTMLTextAreaElement
+    )
+  ) {
+    throw new Error(`no field ${selector}`);
+  }
+  act(() => {
+    Object.getOwnPropertyDescriptor(Object.getPrototypeOf(el), "value")?.set?.call(el, value);
+    el.dispatchEvent(
+      new Event(el instanceof HTMLSelectElement ? "change" : "input", { bubbles: true }),
+    );
+  });
+}
+
+/** The first button whose text includes `label`. */
+export function buttonWithText(host: HTMLElement, label: string): HTMLButtonElement {
+  const button = [...host.querySelectorAll("button")].find((b) => b.textContent?.includes(label));
+  if (!button) throw new Error(`no button "${label}"`);
+  return button;
+}

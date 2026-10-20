@@ -6,16 +6,17 @@ previous one's tests.
 
 ## Stages
 
-| Stage | Branch                         | State | Scope                                                                    |
-| ----- | ------------------------------ | ----- | ------------------------------------------------------------------------ |
-| S0    | `studio/s0-e2e-workflow`       | Done  | Browser gate: import, place, split, trim, undo/redo, reload, export      |
-| S4    | `studio/s4-create-project`     | Done  | New project from the header or the empty start screen; `POST /projects`  |
-| S2    | `studio/s2-media-metadata`     | Done  | Media metadata on asset cards; upload validation                         |
-| S3    | `studio/s3-missing-media`      | Done  | Missing media detection and replacement                                  |
-| S1    | `studio/s1-export-options`     | Done  | Export the in/out range; audio-only export; GIF and PNG sequence options |
-| S5    | `studio/s5-slip-roll`          | Done  | Slip and roll editing                                                    |
-| S6    | `studio/s6-track-lock-solo`    | Done  | Track lock and solo                                                      |
-| S7    | `studio/s7-keyframes-playback` | Done  | Browser verification of keyframes and playback                           |
+| Stage | Branch                         | State  | Scope                                                                    |
+| ----- | ------------------------------ | ------ | ------------------------------------------------------------------------ |
+| S0    | `studio/s0-e2e-workflow`       | Done   | Browser gate: import, place, split, trim, undo/redo, reload, export      |
+| S4    | `studio/s4-create-project`     | Done   | New project from the header or the empty start screen; `POST /projects`  |
+| S2    | `studio/s2-media-metadata`     | Done   | Media metadata on asset cards; upload validation                         |
+| S3    | `studio/s3-missing-media`      | Done   | Missing media detection and replacement                                  |
+| S1    | `studio/s1-export-options`     | Done   | Export the in/out range; audio-only export; GIF and PNG sequence options |
+| S5    | `studio/s5-slip-roll`          | Done   | Slip and roll editing                                                    |
+| S6    | `studio/s6-track-lock-solo`    | Done   | Track lock and solo                                                      |
+| S7    | `studio/s7-keyframes-playback` | Done   | Browser verification of keyframes and playback                           |
+| S8    | `studio/s8-voice-api`          | Review | Voice API: ElevenLabs and OpenAI voices in the CLI, the API and Studio   |
 
 ## Known limitations to plan for
 
@@ -226,3 +227,60 @@ Limits:
   the failure is now handled and the other read draws the filmstrip.
 - **The fixture loads GSAP from its own folder,** since the container's browser cannot reach
   the CDN the other fixtures use.
+
+### S8: voice API
+
+Recorded with S8, for review.
+
+Kokoro's local voices sound synthetic. S8 adds one voice engine with three ways in:
+
+- `synthesizeSpeech`, `describeVoiceProviders` and `listVoices` from `@hyperframes/cli/api`;
+- `hyperframes tts --provider elevenlabs|openai|auto`, with `--model`, `--style` and
+  `--words`. Plain `tts` still runs Kokoro exactly as before;
+- Studio's **Assets → Generate voice**, on `GET /api/voice/providers`,
+  `GET /api/voice/providers/:id/voices` and `POST /api/projects/:id/voice`.
+
+Providers:
+
+- **ElevenLabs** uses `eleven_multilingual_v2` by default, with timed speech
+  (`/with-timestamps`), so word timings come from the provider itself.
+- **OpenAI** uses `gpt-4o-mini-tts`, which follows a plain-words `style` ("tender, unhurried").
+- **Kokoro** is the local fallback. With a signal it now runs off the event loop, so Studio keeps
+  answering while it speaks.
+
+How speech is written:
+
+- Keys are read from `ELEVENLABS_API_KEY` and `OPENAI_API_KEY` in the environment Studio or the CLI
+  starts in. They are never returned or logged.
+- Speech is written as 44.1 kHz mono `.wav` or `.mp3`, renamed into place whole.
+- A speed the provider cannot do natively is applied with ffmpeg's `atempo`, and word timings
+  are scaled to match.
+- Studio never replaces a file: the same words again become `-2`, `-3`.
+
+What the browser test covers (`test:voice-api`, against an ElevenLabs stand-in the
+test serves itself):
+
+- Studio lists the providers and the stand-in's voices.
+- A line in a chosen voice at 0.9× is sent with that speed and comes back as 44.1 kHz mono WAV of
+  the spoken length.
+- The same words at 0.6× become a second file stretched to 1/0.6 of that length, with no native
+  speed sent.
+- A 429 is shown as ElevenLabs worded it, and nothing is written.
+- The first take drags onto the timeline as an `<audio>` clip.
+- No page errors.
+
+Limits:
+
+- **No real provider was called.** This container cannot reach api.elevenlabs.io or
+  api.openai.com, and there is no key here. Request and response shapes follow the providers'
+  published APIs and are covered by stand-ins and unit tests, so the first run with a real key
+  should still be checked by ear.
+- **OpenAI and Kokoro have no word timings of their own;** `words` transcribes the result
+  locally, which needs the whisper or Parakeet runtime.
+- **Studio waits for the whole line** (up to 120 s) with no progress or cancel button. Closing the
+  dialog does not stop a request in flight.
+- **HeyGen and Gemini voices** remain in the media-use skill scripts and are not part of this
+  engine yet. The unmerged `feat/openai-whisper-tts` branch adds OpenAI to those scripts
+  separately.
+- **Long scripts are not split:** a line over a provider's limit (ElevenLabs 10,000 characters,
+  OpenAI 4,096) is refused with the limit named.

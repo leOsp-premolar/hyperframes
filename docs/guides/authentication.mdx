@@ -108,9 +108,11 @@ not user ADC files or metadata-server credentials.
 See [Gemini voiceover](/prompting/media-and-audio#gemini-voiceover).
 
 <Note>
-  `npx hyperframes tts` itself is the local Kokoro CLI. Hosted HeyGen and
-  ElevenLabs and Gemini voices are selected by the bundled media workflow helpers, not by
-  that command.
+  `npx hyperframes tts` runs the local Kokoro model unless you pass `--provider`.
+  With `--provider elevenlabs` it reads `ELEVENLABS_API_KEY`, with `--provider openai`
+  `OPENAI_API_KEY`, and `--provider auto` picks whichever is set, ElevenLabs first.
+  Studio's **Generate voice** uses the same keys from the environment Studio starts in.
+  Hosted HeyGen and Gemini voices are selected by the bundled media workflow helpers.
 </Note>
 
 ## Working offline

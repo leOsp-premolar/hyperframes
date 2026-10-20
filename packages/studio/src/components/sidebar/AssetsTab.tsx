@@ -17,6 +17,7 @@ import { AudioRow } from "./AudioRow";
 import { GlobalAssetsView } from "./GlobalAssetsView";
 import { AssetCard, FontRow } from "./AssetCard";
 import { studioApiFetch } from "../../utils/studioApiFetch";
+import { MicrophoneIcon } from "@phosphor-icons/react";
 
 interface AssetsTabProps {
   projectId: string;
@@ -25,6 +26,8 @@ interface AssetsTabProps {
   onDelete?: (path: string) => void;
   onRename?: (oldPath: string, newPath: string) => void;
   onAddAssetToTimeline?: (path: string) => void;
+  /** Open the voice dialog; the button is hidden without it. */
+  onGenerateVoice?: () => void;
 }
 
 export type UsageFilter = "all" | "used" | "unused";
@@ -144,6 +147,19 @@ function ImportButton({ importing, onClick }: { importing: boolean; onClick: () 
   );
 }
 
+function GenerateVoiceButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="w-full flex items-center justify-center gap-1.5 rounded-md bg-panel-input px-3 py-[7px] text-[11px] font-medium text-panel-text-3 hover:text-panel-text-1 active:scale-[0.98] transition-colors mb-2.5"
+    >
+      <MicrophoneIcon size={11} weight="bold" />
+      Generate voice
+    </button>
+  );
+}
+
 /** Empty list body. A query that matched nothing says so and offers a way out;
  *  a genuinely empty project gets the drop hint. */
 function EmptyState({
@@ -200,6 +216,7 @@ export const AssetsTab = memo(function AssetsTab({
   onDelete,
   onRename,
   onAddAssetToTimeline,
+  onGenerateVoice,
 }: AssetsTabProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = useState(false);
@@ -377,6 +394,7 @@ export const AssetsTab = memo(function AssetsTab({
             />
           </>
         )}
+        {onGenerateVoice && <GenerateVoiceButton onClick={onGenerateVoice} />}
 
         {/* Search — gated on the UNFILTERED pool so it never unmounts itself */}
         {allMediaAssets.length > 0 && (
