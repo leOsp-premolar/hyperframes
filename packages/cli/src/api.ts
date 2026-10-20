@@ -1,6 +1,7 @@
 /**
  * For HyperFrames' own apps; it may change between minor versions. Nothing here prints, reads
- * argv or exits. Known failures throw TranscribeError or RemoveBackgroundError with a `code`.
+ * argv or exits. Known failures throw TranscribeError, RemoveBackgroundError or VoiceError with a
+ * `code`.
  */
 import { runTranscribe, type TranscribeOptions, type TranscribeResult } from "./api/transcribe.js";
 
@@ -28,6 +29,26 @@ export {
   type RemoveBackgroundQuality,
   type RemoveBackgroundResult,
 } from "./api/removeBackground.js";
+export {
+  MAX_SPEED,
+  MIN_SPEED,
+  SPEECH_EXTENSIONS,
+  VOICE_PROVIDERS,
+  VoiceError,
+  describeVoiceProviders,
+  isVoiceProviderChoice,
+  listVoices,
+  synthesizeSpeech,
+  type SpeechWord,
+  type SynthesizeSpeechOptions,
+  type SynthesizeSpeechResult,
+  type VoiceErrorCode,
+  type VoiceProviderChoice,
+  type VoiceProviderId,
+  type VoiceProviderSummary,
+  type VoiceProvidersSummary,
+  type VoiceSummary,
+} from "./api/voice.js";
 
 /** Transcribe media to `dir`/transcript.json, or import or export a transcript file. */
 export function transcribe(options: TranscribeOptions): Promise<TranscribeResult> {

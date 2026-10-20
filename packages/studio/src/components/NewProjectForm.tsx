@@ -1,5 +1,5 @@
-import { useState, type FormEvent, type ReactNode } from "react";
-import { Button, cn, fieldBase, fieldText } from "./ui";
+import { useState, type FormEvent } from "react";
+import { Button, FormField as Field, cn, fieldBase, fieldText } from "./ui";
 import {
   CUSTOM_RESOLUTION,
   RESOLUTION_PRESETS,
@@ -14,25 +14,6 @@ interface NewProjectFormProps {
 }
 
 const DEFAULT_PRESET = RESOLUTION_PRESETS[0];
-
-function Field({
-  label,
-  htmlFor,
-  children,
-}: {
-  label: string;
-  htmlFor: string;
-  children: ReactNode;
-}) {
-  return (
-    <div className="flex flex-col gap-1">
-      <label htmlFor={htmlFor} className="text-step-10 text-text-3">
-        {label}
-      </label>
-      {children}
-    </div>
-  );
-}
 
 function NumberInput({
   id,

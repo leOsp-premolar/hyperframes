@@ -358,8 +358,10 @@ partial file.
 
 ### `tts`
 
-Generate speech with a local model (Kokoro-82M). No API key, nothing leaves the
-machine.
+Generate speech. By default it runs a local model (Kokoro-82M): no API key,
+nothing leaves the machine. With `--provider` it speaks with ElevenLabs or
+OpenAI voices instead, which sound far more natural, and can save each word's
+timing for captions.
 
 ```bash
 npx hyperframes tts "Welcome to HyperFrames"
@@ -367,16 +369,32 @@ npx hyperframes tts "Intro" --voice bf_emma --output narration.wav
 npx hyperframes tts "Slow and clear" --speed 0.8
 npx hyperframes tts script.txt
 npx hyperframes tts --list
+
+# Hosted voices (key in ELEVENLABS_API_KEY or OPENAI_API_KEY)
+npx hyperframes tts "Con la primera luz" --provider elevenlabs --lang es --words words.json
+npx hyperframes tts "Una pequeña semilla despertó" --provider openai --voice coral \
+  --style "tender, warm and unhurried"
+npx hyperframes tts "Hola" --provider auto -o hola.mp3
+npx hyperframes tts --list --provider elevenlabs
 ```
 
-| Flag           | Description                                                                                                                             |
-| -------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| `--output, -o` | Output path (default `speech.wav` in the current directory)                                                                              |
-| `--voice, -v`  | Voice ID. Run `--list` to see them all.                                                                                                 |
-| `--speed, -s`  | Speed multiplier (default 1.0)                                                                                                          |
-| `--lang, -l`   | Phonemizer locale: `en-us`, `en-gb`, `es`, `fr-fr`, `hi`, `it`, `pt-br`, `ja`, `zh`. Inferred from the voice ID when you leave it out.   |
-| `--list`       | List the voices and exit                                                                                                                |
-| `--json`       | Output the result as JSON                                                                                                               |
+| Flag             | Description                                                                                                                                                         |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--output, -o`   | Output path (default `speech.wav` in the current directory). `.mp3` works with any provider except plain Kokoro.                                                   |
+| `--provider, -p` | `kokoro` (default), `elevenlabs`, `openai`, or `auto`: ElevenLabs, then OpenAI, whichever has a key, else Kokoro                                                     |
+| `--voice, -v`    | Voice ID. Run `--list` (with `--provider`) to see them.                                                                                                             |
+| `--model`        | Provider model: `eleven_multilingual_v2` (default), `eleven_v3`, `eleven_turbo_v2_5`, `eleven_flash_v2_5`; `gpt-4o-mini-tts` (default), `tts-1-hd`, `tts-1`         |
+| `--style`        | How to say it, in plain words. OpenAI `gpt-4o-mini-tts` follows it; the JSON result says whether it was used.                                                       |
+| `--words`        | Also write word timings to this `.json` file, in `transcript.json` format. ElevenLabs times words itself; the others are transcribed locally.                        |
+| `--speed, -s`    | Speed multiplier (default 1.0; 0.5–2 with `--provider`). Pitch is kept.                                                                                             |
+| `--lang, -l`     | Kokoro's phonemizer locale: `en-us`, `en-gb`, `es`, `fr-fr`, `hi`, `it`, `pt-br`, `ja`, `zh`, inferred from the voice ID when you leave it out. With `--provider`, the text's language code (`es`, `en`, …). |
+| `--list`         | List the voices and exit                                                                                                                                            |
+| `--json`         | Output the result as JSON                                                                                                                                           |
+
+Hosted speech is written as 44.1 kHz mono. Set `ELEVENLABS_BASE_URL` or
+`OPENAI_BASE_URL` to route requests through a proxy. The same engine is
+available to scripts as `synthesizeSpeech` from `@hyperframes/cli/api`, and to
+Studio as **Assets → Generate voice**.
 
 A voice ID's first letter is its language: `a` American, `b` British,
 `e` Spanish, `f` French, `h` Hindi, `i` Italian, `j` Japanese, `p` Brazilian

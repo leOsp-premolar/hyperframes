@@ -38,9 +38,13 @@ const { execFileSyncMock, getCapturedArgv, resetCapturedArgv } = vi.hoisted(() =
   };
 });
 
+// With a signal, synthesis goes through the callback execFile instead, so a server keeps
+// answering while Kokoro speaks.
+const { execFileMock } = vi.hoisted(() => ({ execFileMock: vi.fn() }));
+
 vi.mock("node:child_process", async (importOriginal) => {
   const actual = await importOriginal<typeof import("node:child_process")>();
-  return { ...actual, execFileSync: execFileSyncMock };
+  return { ...actual, execFile: execFileMock, execFileSync: execFileSyncMock };
 });
 
 vi.mock("node:fs", async (importOriginal) => {
@@ -132,5 +136,52 @@ describe("synthesize — Kokoro voice token overflow", () => {
     expect(source).toContain("def synthesize_text(value):");
     expect(source).toContain("samples.extend(right_samples)");
     expect(source).toContain('const SCRIPT_PATH = join(SCRIPT_DIR, "synth-v3.py")');
+  });
+});
+
+type ExecCallback = (err: Error | null, stdout: string, stderr: string) => void;
+
+describe("synthesize with a signal", () => {
+  beforeEach(() => execFileMock.mockReset());
+
+  it("runs the script through execFile and reads its result", async () => {
+    execFileMock.mockImplementationOnce(
+      (_file: string, args: string[], _opts: unknown, cb: ExecCallback) => {
+        const result = { outputPath: args[6], sampleRate: 24000, durationSeconds: 2.5 };
+        cb(null, JSON.stringify({ ...result, langApplied: true }), "");
+      },
+    );
+    const signal = new AbortController().signal;
+    const result = await synthesize("Hola", "/tmp/out.wav", { voice: "ef_dora", signal });
+    expect(result.durationSeconds).toBe(2.5);
+    const [, args, opts] = execFileMock.mock.calls.at(-1) ?? [];
+    expect(args[3]).toBe("Hola");
+    expect(args[LANG_ARGV_INDEX]).toBe("es");
+    expect(opts.signal).toBe(signal);
+  });
+
+  it("rejects with the abort reason when the signal ends the run", async () => {
+    const controller = new AbortController();
+    execFileMock.mockImplementationOnce(
+      (_file: string, _args: string[], opts: { signal: AbortSignal }, cb: ExecCallback) => {
+        opts.signal.addEventListener("abort", () => cb(new Error("killed"), "", ""));
+      },
+    );
+    const reason = new Error("stop");
+    const run = synthesize("Hola", "/tmp/out.wav", { signal: controller.signal });
+    await vi.waitFor(() => expect(execFileMock).toHaveBeenCalled());
+    controller.abort(reason);
+    await expect(run).rejects.toBe(reason);
+  });
+
+  it("keeps the stderr tail in the failure message", async () => {
+    execFileMock.mockImplementationOnce(
+      (_file: string, _args: string[], _opts: unknown, cb: ExecCallback) => {
+        cb(new Error("exit 1"), "", "ValueError: voice not found");
+      },
+    );
+    await expect(
+      synthesize("Hola", "/tmp/out.wav", { signal: new AbortController().signal }),
+    ).rejects.toThrow(/voice not found/);
   });
 });

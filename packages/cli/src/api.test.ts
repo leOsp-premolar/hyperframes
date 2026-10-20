@@ -292,6 +292,13 @@ describe("transcribe", () => {
     return { err, elapsed: Date.now() - started, pids };
   }
 
+  /** The run ended as cancelled, promptly, and left none of its processes behind. */
+  function expectStopped({ err, elapsed, pids }: Awaited<ReturnType<typeof abortWhileRunning>>) {
+    expect(err.code).toBe("cancelled");
+    expect(elapsed).toBeLessThan(10_000);
+    for (const pid of pids) expect(() => process.kill(pid, 0), `pid ${pid}`).toThrow();
+  }
+
   it.skipIf(process.platform === "win32")(
     "stops a whisper runtime install in progress when the signal aborts",
     async (ctx) => {
@@ -307,14 +314,7 @@ describe("transcribe", () => {
       vi.stubEnv("HYPERFRAMES_WHISPER_PATH", "");
       if (manager.findWhisper()) ctx.skip();
 
-      const { err, elapsed, pids } = await abortWhileRunning(pidFile, {
-        input: dummyAudio(),
-        engine: "whisper",
-      });
-
-      expect(err.code).toBe("cancelled");
-      expect(elapsed).toBeLessThan(10_000);
-      for (const pid of pids) expect(() => process.kill(pid, 0), `pid ${pid}`).toThrow();
+      expectStopped(await abortWhileRunning(pidFile, { input: dummyAudio(), engine: "whisper" }));
     },
   );
 
@@ -336,11 +336,7 @@ describe("transcribe", () => {
       const wavs = () =>
         readdirSync(tmpdir()).filter((f) => f.startsWith(`hyperframes-audio-${process.pid}-`));
 
-      const { err, elapsed, pids } = await abortWhileRunning(pidFile, { input, engine: "whisper" });
-
-      expect(err.code).toBe("cancelled");
-      expect(elapsed).toBeLessThan(10_000);
-      for (const pid of pids) expect(() => process.kill(pid, 0), `pid ${pid}`).toThrow();
+      expectStopped(await abortWhileRunning(pidFile, { input, engine: "whisper" }));
       expect(wavs()).toEqual([]);
     },
   );
@@ -369,6 +365,10 @@ describe("transcribe", () => {
       "utils/download.test.ts",
       "utils/stoppableExecFile.ts",
       "utils/stoppableExecFile.test.ts",
+      "tts/manager.ts",
+      "tts/python.ts",
+      "tts/synthesize.ts",
+      ...readdirSync(join(here, "voice")).map((f) => join("voice", f)),
       "whisper/manager.ts",
       "whisper/modelForLanguage.ts",
       "whisper/parakeet.ts",

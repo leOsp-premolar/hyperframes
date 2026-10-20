@@ -43,6 +43,25 @@ work around it.
 Listen before building the final edit. Fix wording, pronunciation, or delivery
 in the script or voice direction rather than cutting around a bad read.
 
+### Generate a line yourself
+
+In Studio, **Assets → Generate voice** speaks a line into `assets/voice/` with
+the best voice you have set up: ElevenLabs when `ELEVENLABS_API_KEY` is set,
+then OpenAI with `OPENAI_API_KEY`, else the local Kokoro model. Pick a voice,
+a speed and, for OpenAI, how to say it ("tender and unhurried"). The new file
+appears in Assets, ready to drag onto the timeline; a second take of the same
+words is kept beside the first.
+
+From a terminal, the same engine is `tts --provider`, and `--words` saves each
+word's timing for captions:
+
+```bash
+npx hyperframes tts "Con la primera luz de la mañana" --provider elevenlabs \
+  --lang es --speed 0.9 -o assets/voice/intro.wav --words assets/voice/intro.json
+```
+
+See [`tts`](/packages/cli#tts) for every option.
+
 ## Transcribe recorded speech
 
 Transcription creates timed words from an audio or video file. Start with the

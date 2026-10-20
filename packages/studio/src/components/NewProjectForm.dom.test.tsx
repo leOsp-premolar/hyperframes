@@ -6,7 +6,12 @@
  */
 import React, { act } from "react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { cleanupMounted, mountHost } from "./ui/mountHost.testHelpers";
+import {
+  buttonWithText,
+  cleanupMounted,
+  mountHost,
+  typeInto as type,
+} from "./ui/mountHost.testHelpers";
 import { NewProjectForm } from "./NewProjectForm";
 
 const fetchMock = vi.fn<typeof fetch>();
@@ -33,26 +38,8 @@ function answer(status: number, body: unknown) {
   );
 }
 
-/** React listens for the native input event; set the value through the prototype setter first. */
-function type(host: HTMLElement, selector: string, value: string) {
-  const el = host.querySelector<HTMLInputElement | HTMLSelectElement>(selector);
-  if (!el) throw new Error(`no ${selector}`);
-  const proto =
-    el instanceof HTMLSelectElement ? HTMLSelectElement.prototype : HTMLInputElement.prototype;
-  act(() => {
-    Object.getOwnPropertyDescriptor(proto, "value")?.set?.call(el, value);
-    el.dispatchEvent(
-      new Event(el instanceof HTMLSelectElement ? "change" : "input", { bubbles: true }),
-    );
-  });
-}
-
 function submitButton(host: HTMLElement) {
-  const button = [...host.querySelectorAll("button")].find((b) =>
-    b.textContent?.includes("Create project"),
-  );
-  if (!button) throw new Error("no submit button");
-  return button;
+  return buttonWithText(host, "Create project");
 }
 
 async function submit(host: HTMLElement) {

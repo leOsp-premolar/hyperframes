@@ -22,6 +22,7 @@ export {
 export type { MenuItemTone, PopupPreviewState } from "./Menu";
 export { Popover } from "./Popover";
 export { Input, fieldBase, fieldText } from "./Input";
+export { FormField } from "./FormField";
 export type { InputProps } from "./Input";
 export { NumberField } from "./NumberField";
 export type { NumberFieldProps } from "./NumberField";

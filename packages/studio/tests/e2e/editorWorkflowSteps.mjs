@@ -187,14 +187,14 @@ async function importClip({ page, projectDir, sourcePath, evidence, failures }) 
   check(failures, evidence.imported, "the imported clip was not written into the project");
 }
 
-// 2. Drag the asset card onto the empty timeline. The card's own dragstart fills the
-// DataTransfer and the timeline's own drop handler reads it; only the pointer travel is synthetic.
-async function placeOnTimeline({ page, waitForDisk, shot, evidence }) {
+/**
+ * Drag the asset card `cardSelector` onto the empty timeline. The card's own dragstart fills the
+ * DataTransfer and the timeline's own drop handler reads it; only the pointer travel is synthetic.
+ */
+export async function dropOnEmptyTimeline(page, cardSelector) {
   await waitForEmptyTimeline(page);
-  await page.evaluate(() => {
-    const card = [...document.querySelectorAll('[draggable="true"]')].find((el) =>
-      el.textContent.includes("clip"),
-    );
+  await page.evaluate((selector) => {
+    const card = document.querySelector(selector);
     const hint = [...document.querySelectorAll("*")].find(
       (e) => e.children.length === 0 && e.textContent.trim().startsWith("Drop media here"),
     );
@@ -218,7 +218,19 @@ async function placeOnTimeline({ page, waitForDisk, shot, evidence }) {
       );
     }
     card.dispatchEvent(new DragEvent("dragend", { bubbles: true, dataTransfer }));
-  });
+  }, cardSelector);
+}
+
+/** Every uncaught error the page throws from now on. */
+export function watchPageErrors(page) {
+  const errors = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  return errors;
+}
+
+// 2. Drag the imported clip's card onto the empty timeline.
+async function placeOnTimeline({ page, waitForDisk, shot, evidence }) {
+  await dropOnEmptyTimeline(page, '[draggable="true"][data-asset-path="clip.mp4"]');
   await clipCount(page, 1);
   evidence.placed = await waitForDisk(
     (clips) =>
