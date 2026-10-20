@@ -7,6 +7,7 @@ import { writeSpeechFile } from "./audioFile.js";
 import { elevenlabs } from "./elevenlabs.js";
 import { kokoro } from "./kokoro.js";
 import { openai } from "./openai.js";
+import { studio } from "./studioVoices.js";
 import {
   MAX_SPEED,
   MAX_STYLE_LENGTH,
@@ -112,7 +113,7 @@ export function defaultVoiceDeps(): VoiceDeps {
   return {
     env: process.env,
     fetch: globalThis.fetch,
-    providers: { elevenlabs, openai, kokoro },
+    providers: { elevenlabs, openai, kokoro, studio },
     writeSpeech: writeSpeechFile,
     transcribeWords,
   };

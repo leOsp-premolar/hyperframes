@@ -52,11 +52,17 @@ function deps(env: VoiceEnv = {}, overrides: Partial<VoiceDeps> = {}) {
   const eleven = fakeProvider("elevenlabs");
   const open = fakeProvider("openai");
   const local = fakeProvider("kokoro");
+  const presets = fakeProvider("studio", { configured: () => true });
   const writes: { outputPath: string; tempo: number }[] = [];
   const d: VoiceDeps = {
     env,
     fetch: globalThis.fetch,
-    providers: { elevenlabs: eleven.provider, openai: open.provider, kokoro: local.provider },
+    providers: {
+      elevenlabs: eleven.provider,
+      openai: open.provider,
+      kokoro: local.provider,
+      studio: presets.provider,
+    },
     writeSpeech: async (_audio, outputPath, options) => {
       writes.push({ outputPath, tempo: options.tempo });
       return 2;
@@ -242,6 +248,7 @@ describe("describeVoiceProvidersWith", () => {
       ["elevenlabs", false, "set up elevenlabs"],
       ["openai", true, undefined],
       ["kokoro", true, undefined],
+      ["studio", true, undefined],
     ]);
     expect(JSON.stringify(summary)).not.toContain("secret");
   });

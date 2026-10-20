@@ -99,6 +99,25 @@ describe("ElevenLabs", () => {
     expect(calls[0]?.url).toMatch(/^http:\/\/127\.0\.0\.1:9\/v1\/text-to-speech\/a%2Fb\//);
   });
 
+  it("sends a voice's delivery settings with the speed", async () => {
+    const { fetchFn, calls } = fakeFetch(() => json({ audio_base64: AUDIO }));
+    await elevenlabs.synthesize(
+      {
+        ...request,
+        speed: 0.9,
+        tuning: { stability: 0.4, similarity: 0.75, style: 0.3, speakerBoost: true },
+      },
+      context({ ELEVENLABS_API_KEY: KEY }, fetchFn),
+    );
+    expect(sentBody(calls[0])["voice_settings"]).toEqual({
+      stability: 0.4,
+      similarity_boost: 0.75,
+      style: 0.3,
+      use_speaker_boost: true,
+      speed: 0.9,
+    });
+  });
+
   it.each([
     [401, { detail: { status: "invalid_api_key", message: "Invalid API key" } }, "auth_failed"],
     [429, { detail: { message: "Too many concurrent requests" } }, "rate_limited"],

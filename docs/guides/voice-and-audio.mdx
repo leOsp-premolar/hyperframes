@@ -62,6 +62,32 @@ npx hyperframes tts "Con la primera luz de la mañana" --provider elevenlabs \
 
 See [`tts`](/packages/cli#tts) for every option.
 
+### Studio voices
+
+**Studio voices** is a set of ten voices for Spanish narration, from high to low, five women
+and five men. Each is one of the voices every ElevenLabs account has, used exactly as
+ElevenLabs speaks it: the voices differ in who speaks and in delivery, steadier or more
+expressive, never in processing applied afterwards. They need `ELEVENLABS_API_KEY`.
+
+| Voice   | Register      | Median pitch in Spanish | Manner                   |
+| ------- | ------------- | ----------------------- | ------------------------ |
+| Aurora  | woman, high   | 212 Hz                  | bright and warm          |
+| Brisa   | woman, high   | 210 Hz                  | clear and lively         |
+| Clara   | woman, mid    | 187 Hz                  | calm and trustworthy     |
+| Dalia   | woman, mid    | 186 Hz                  | young and cheerful       |
+| Elena   | woman, low    | 159 Hz                  | velvety and unhurried    |
+| Fabián  | man, high     | 163 Hz                  | smooth and close         |
+| Gael    | man, mid      | 140 Hz                  | steady, a broadcaster    |
+| Hugo    | man, mid      | 124 Hz                  | warm, a storyteller      |
+| Íker    | man, low      | 116 Hz                  | relaxed and optimistic   |
+| Joaquín | man, low      | 105 Hz                  | deep and comforting      |
+
+These are English voices speaking Spanish, so some may carry an accent. Native Spanish voices from
+the ElevenLabs library, or voices designed for you, need a paid plan.
+
+Speech made from ElevenLabs voices follows your ElevenLabs plan's terms; on the free plan
+that means attribution and no commercial use.
+
 ## Transcribe recorded speech
 
 Transcription creates timed words from an audio or video file. Start with the

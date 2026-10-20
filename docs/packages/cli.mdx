@@ -376,12 +376,13 @@ npx hyperframes tts "Una pequeña semilla despertó" --provider openai --voice c
   --style "tender, warm and unhurried"
 npx hyperframes tts "Hola" --provider auto -o hola.mp3
 npx hyperframes tts --list --provider elevenlabs
+npx hyperframes tts "Hola" --provider studio --voice aurora   # see --list --provider studio
 ```
 
 | Flag             | Description                                                                                                                                                         |
 | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `--output, -o`   | Output path (default `speech.wav` in the current directory). `.mp3` works with any provider except plain Kokoro.                                                   |
-| `--provider, -p` | `kokoro` (default), `elevenlabs`, `openai`, or `auto`: ElevenLabs, then OpenAI, whichever has a key, else Kokoro                                                     |
+| `--provider, -p` | `kokoro` (default), `elevenlabs`, `openai`, `studio` (ten ElevenLabs voices for Spanish, from high to low), or `auto`: ElevenLabs, then OpenAI, whichever has a key, else Kokoro |
 | `--voice, -v`    | Voice ID. Run `--list` (with `--provider`) to see them.                                                                                                             |
 | `--model`        | Provider model: `eleven_multilingual_v2` (default), `eleven_v3`, `eleven_turbo_v2_5`, `eleven_flash_v2_5`; `gpt-4o-mini-tts` (default), `tts-1-hd`, `tts-1`         |
 | `--style`        | How to say it, in plain words. OpenAI `gpt-4o-mini-tts` follows it; the JSON result says whether it was used.                                                       |
